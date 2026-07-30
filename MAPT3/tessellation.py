@@ -6,6 +6,7 @@
 """
 
 # External dependencies:
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.path as mpltPath
@@ -602,6 +603,10 @@ class PlateGather:
         self.rotmask = []
         self.P1 = []
         self.P2 = []
+        self.hdivb  = []     # horizontal divergence at boundaries
+        self.hvorb  = []     # vertical vorticity at boundaries
+        self.T  = []         # temperature
+        self.Tb = []         # temperature at boundaries
         # --------- Grid rotation
         self.grot_theta  = []
         self.grot_axis   = []
@@ -648,6 +653,151 @@ class PlateGather:
             self.latb  = -(self.latb*180/np.pi-90)
             self.lonb  = self.lonb*180/np.pi
 
+    # def remove_micro_plates(self, min_points=3):
+    #     """MicroPlateCorrection: Remove plates with less than min_points points.
+    #     This ensures consistency across all data structures in PlateGather.
+        
+    #     Args:
+    #         min_points (int): Minimum number of points required for a plate. Default is 3.
+    #     """
+    #     # MicroPlateCorrection: Check if pstart/pend are available, reconstruct if needed
+    #     if len(self.pstart) == 0 or len(self.pend) == 0:
+    #         # Reconstruct pstart and pend from plateID
+    #         self.pstart = np.zeros(self.nop, dtype=np.int32)
+    #         self.pend = np.zeros(self.nop, dtype=np.int32)
+    #         current_idx = 0
+    #         for plate_idx in range(self.nop):
+    #             plate_mask = self.plateID == plate_idx
+    #             plate_indices = np.where(plate_mask)[0]
+    #             if len(plate_indices) > 0:
+    #                 self.pstart[plate_idx] = current_idx
+    #                 self.pend[plate_idx] = current_idx + len(plate_indices)
+    #                 current_idx += len(plate_indices)
+        
+    #     # MicroPlateCorrection: Identify plates with sufficient points
+    #     valid_plates_mask = self.surf >= min_points
+    #     n_removed = np.sum(~valid_plates_mask)
+        
+    #     if n_removed == 0:
+    #         self.im(f'No micro plates found (all plates have >= {min_points} points)')
+    #         return
+        
+    #     self.im(f'MicroPlateCorrection: Removing {n_removed} plates with < {min_points} points')
+        
+    #     # MicroPlateCorrection: Get indices of valid plates
+    #     valid_plate_indices = np.where(valid_plates_mask)[0]
+        
+    #     # MicroPlateCorrection: Create mask for surface points belonging to valid plates
+    #     surface_mask = np.zeros(len(self.x), dtype=bool)
+    #     for plate_idx in valid_plate_indices:
+    #         start_idx = self.pstart[plate_idx]
+    #         end_idx = self.pend[plate_idx]
+    #         surface_mask[start_idx:end_idx] = True
+        
+    #     # MicroPlateCorrection: Filter surface data
+    #     self.x = self.x[surface_mask]
+    #     self.y = self.y[surface_mask]
+    #     self.z = self.z[surface_mask]
+    #     self.vx = self.vx[surface_mask]
+    #     self.vy = self.vy[surface_mask]
+    #     self.vz = self.vz[surface_mask]
+    #     self.vr = self.vr[surface_mask]
+    #     self.vtheta = self.vtheta[surface_mask]
+    #     self.vphi = self.vphi[surface_mask]
+    #     self.pressure = self.pressure[surface_mask]
+    #     self.magGSV = self.magGSV[surface_mask]
+    #     self.plateID = self.plateID[surface_mask]
+    #     self.pointID = self.pointID[surface_mask]
+    #     self.pmin = self.pmin[surface_mask]
+    #     self.lon = self.lon[surface_mask]
+    #     self.lat = self.lat[surface_mask]
+    #     self.r = self.r[surface_mask]
+        
+    #     # MicroPlateCorrection: Update plate metadata arrays
+    #     self.surf = self.surf[valid_plates_mask]
+    #     old_pstart = self.pstart.copy()
+    #     old_pend = self.pend.copy()
+        
+    #     # MicroPlateCorrection: Recalculate pstart and pend for valid plates
+    #     self.pstart = np.zeros(len(valid_plate_indices), dtype=np.int32)
+    #     self.pend = np.zeros(len(valid_plate_indices), dtype=np.int32)
+    #     current_idx = 0
+    #     for new_idx, old_idx in enumerate(valid_plate_indices):
+    #         plate_size = old_pend[old_idx] - old_pstart[old_idx]
+    #         self.pstart[new_idx] = current_idx
+    #         self.pend[new_idx] = current_idx + plate_size
+    #         current_idx += plate_size
+        
+    #     # MicroPlateCorrection: Filter edge data if present
+    #     if len(self.xe) > 0 and len(self.peri) > 0:
+    #         self.peri = self.peri[valid_plates_mask]
+            
+    #         # MicroPlateCorrection: Create mask for edge points belonging to valid plates
+    #         edge_mask = np.zeros(len(self.xe), dtype=bool)
+    #         old_estart = self.estart.copy()
+    #         old_eend = self.eend.copy()
+    #         for plate_idx in valid_plate_indices:
+    #             if plate_idx < len(old_estart):
+    #                 start_idx = old_estart[plate_idx]
+    #                 end_idx = old_eend[plate_idx]
+    #                 edge_mask[start_idx:end_idx] = True
+            
+    #         # MicroPlateCorrection: Filter edge arrays
+    #         self.xe = self.xe[edge_mask]
+    #         self.ye = self.ye[edge_mask]
+    #         self.ze = self.ze[edge_mask]
+    #         self.vxe = self.vxe[edge_mask]
+    #         self.vye = self.vye[edge_mask]
+    #         self.vze = self.vze[edge_mask]
+    #         self.vre = self.vre[edge_mask]
+    #         self.vthetae = self.vthetae[edge_mask]
+    #         self.vphie = self.vphie[edge_mask]
+    #         self.pressuree = self.pressuree[edge_mask]
+    #         self.magGSVe = self.magGSVe[edge_mask]
+    #         self.plateIDe = self.plateIDe[edge_mask]
+    #         self.pointIDe = self.pointIDe[edge_mask]
+    #         self.pmine = self.pmine[edge_mask]
+    #         self.lone = self.lone[edge_mask]
+    #         self.late = self.late[edge_mask]
+    #         self.re = self.re[edge_mask]
+            
+    #         # MicroPlateCorrection: Recalculate estart and eend for valid plates
+    #         self.estart = np.zeros(len(valid_plate_indices), dtype=np.int32)
+    #         self.eend = np.zeros(len(valid_plate_indices), dtype=np.int32)
+    #         current_idx = 0
+    #         for new_idx, old_idx in enumerate(valid_plate_indices):
+    #             if old_idx < len(old_estart):
+    #                 plate_size = old_eend[old_idx] - old_estart[old_idx]
+    #                 self.estart[new_idx] = current_idx
+    #                 self.eend[new_idx] = current_idx + plate_size
+    #                 current_idx += plate_size
+        
+    #     # MicroPlateCorrection: Update surface and edge file lists
+    #     if len(self.surffile) > 0:
+    #         self.surffile = [self.surffile[i] for i in valid_plate_indices]
+    #     if len(self.edgefile) > 0:
+    #         self.edgefile = [self.edgefile[i] for i in valid_plate_indices]
+        
+    #     # MicroPlateCorrection: Filter dimension arrays if they exist
+    #     if hasattr(self, 'surfdim') and len(self.surfdim) > 0:
+    #         if isinstance(self.surfdim, np.ndarray) and len(self.surfdim) == len(valid_plates_mask):
+    #             self.surfdim = self.surfdim[valid_plates_mask]
+    #     if hasattr(self, 'peridim') and len(self.peridim) > 0:
+    #         if isinstance(self.peridim, np.ndarray) and len(self.peridim) == len(valid_plates_mask):
+    #             self.peridim = self.peridim[valid_plates_mask]
+        
+    #     # MicroPlateCorrection: Update number of plates
+    #     self.nop = len(valid_plate_indices)
+        
+    #     # MicroPlateCorrection: Remap plateID values to new indices (0 to nop-1)
+    #     plateID_remap = np.full(int(np.max(self.plateID) + 1), -1, dtype=np.int32)
+    #     for new_idx, old_idx in enumerate(valid_plate_indices):
+    #         plateID_remap[int(old_idx)] = new_idx
+    #     self.plateID = plateID_remap[self.plateID.astype(np.int32)]
+    #     if len(self.plateIDe) > 0:
+    #         self.plateIDe = plateID_remap[self.plateIDe.astype(np.int32)]
+        
+    #     self.im(f'MicroPlateCorrection: {self.nop} plates remaining after filtering')
 
 
     def load(self,nod,surfdir,surflist,edgedir,edgelist,path2boundaries,persistence=np.nan,separator=',',internal_verbose=False,\
@@ -694,6 +844,8 @@ class PlateGather:
             self.surf = self.surf[mask]
             self.peri = self.peri[mask]
             self.im('Loading done!')
+            # MicroPlateCorrection: Plate filtering is now handled in remove_micro_plates method
+            # which is called automatically in load_surfaces and load_edges
         else:
             self.im('Wrong files in input, incoherent surface and boundary files')
 
@@ -792,6 +944,8 @@ class PlateGather:
         # cret lon lat
         self.im('Compute geographical coordinates')
         self.xyz2latlon('Surfaces')
+        # MicroPlateCorrection: Remove plates with insufficient points
+        # self.remove_micro_plates(min_points=3)
         self.im('Surfaces loaded!')
     
 
@@ -886,6 +1040,8 @@ class PlateGather:
         # cret lon lat
         self.im('Compute geographical coordinates')
         self.xyz2latlon('Edges')
+        # MicroPlateCorrection: Remove plates with insufficient points
+        # self.remove_micro_plates(min_points=3)
         self.im('Edeges loaded!')
     
 
@@ -1310,7 +1466,6 @@ class PlateGather:
                         ax.plot(lon[i],lat[i],'-',color='black',transform=ccrs.PlateCarree())
             plt.show()
     
-
 
     def get_plateID(self,lon,lat,on_poly=False):
         """
@@ -1920,6 +2075,17 @@ class PlateGather:
             maskinNb[maskin[:,2]] += 1
             maskinWithin = maskinNb >= 2 # Consider that all the triangles having at least 2 points within the plate are forming the plate
             simplicesPlate = simplices[maskinWithin,:]
+
+            # Debug info for plates with no simplices 
+            if simplicesPlate.shape[0] == 0:
+                self.im(f'  WARNING: Plate {uPID[i]} (plate {i}): 0 simplices found!')
+                self.im(f'           Points in plate: {np.count_nonzero(m)}')
+                self.im(f'           Triangles with >= 2 pts: {np.count_nonzero(maskinWithin)} / {len(maskinWithin)}')
+                self.im(f'           Triangles with 0 pts: {np.count_nonzero(maskinNb == 0)}')
+                self.im(f'           Triangles with 1 pt:  {np.count_nonzero(maskinNb == 1)}')
+                self.im(f'           Triangles with 2 pts: {np.count_nonzero(maskinNb == 2)}')
+                self.im(f'           Triangles with 3 pts: {np.count_nonzero(maskinNb == 3)}')
+
             area = 0
             for j in range(simplicesPlate.shape[0]):
                 pt1,pt2,pt3 = simplicesPlate[j,:]
@@ -1936,7 +2102,7 @@ class PlateGather:
             self.surfdim[i] = area #adim
         self.surfdim = self.surfdim * (4*np.pi*Project.planetaryModel.radius**2)/tri.area # dim
         
-    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',plot=False,verbose=False):
+    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',interval='log',plot=False,verbose=False):
         """
         Function computing and returning the cumulative, inverse
         cumulative and PDF representing the distribution of an
@@ -1976,7 +2142,7 @@ class PlateGather:
             raise ValueError('Missing dimensionalized plate areas. Use first the internal function compute_dim_perimeter_area()')
         else:
             data = self.surfdim.copy()
-            bins, invcumul, cumul, pdf = distribution(data, binning=binning, nbins=nbins, step=step, small=small, plot=False, verbose=verbose)
+            bins, cumul, pdf, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = distribution(data, binning=binning, nbins=nbins, step=step, small=small, earthSizeDistriFile=earthSizeDistriFile,interval=interval,plot=False, verbose=verbose)
             
             # Plot the PDF
             if plot:
@@ -1997,7 +2163,7 @@ class PlateGather:
                     ax.set_yscale('log')
                 plt.show()
             
-            return bins, invcumul, cumul, pdf, pdfBird
+            return bins, cumul, pdf, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird
 
 
     def expand_plate2surface(self,arr,on_poly=False):
@@ -2179,6 +2345,8 @@ class PlateGather:
         The .h5 file thus created can be loaded into the current class instance
         using the self.load_from_h5 function.
 
+        MicroPlateCorrection: Exports data after micro-plate filtering has been applied.
+        
         Args:
             path2h5 (str): complete path to the .h5 data file.
         """
@@ -2267,3 +2435,382 @@ class PlateGather:
         # close
         fid.close()
         self.im('Exportation done successfully!')
+
+    def boundariesDiagnostic_MM(self,plateID=None,plot=False):
+        """
+        This function returns of an automatic diagnotic on the plate
+        boundary type and fill the internal field .btype that have the
+        same length as self.lonb.
+        NOTE 0 : this function is rewritten by MM to exclude composition. 
+        NOTE 1: You have to have import before vorticity, divergence data,
+                temperature and continental composition data.
+        NOTE 2: You can give a plate ID value to have a verbose diagnostic on
+                a particular plate.
+        """
+        if len(self.hvorb) != len(self.lonb):
+            self.im('You have to import vorticity data before',error=True)
+        if len(self.hdivb) != len(self.lonb):
+            self.im('You have to import divergence data before',error=True)
+        elif len(self.vrb) != len(self.lonb):
+            self.im('You have to import velocity data before',error=True)
+        # elif len(self.Tb) != len(self.lonb):
+            # self.im('You have to import temperature data before',error=True)
+        else:
+            self.im('Automatic plates boundaries diagnostic')
+            mSub1 = self.hdivb < -1000
+            mSub2 = self.vrb < -50
+            # mSub2 = self.Tb < 0.6
+            mSub  = mSub1 * mSub2
+            mRid1 = self.hdivb > +1000
+            mRid2 = self.vrb > +50
+            # mRid2 = self.Tb > 0.78
+            mRid  = mRid1 * mRid2
+            mTra1 = abs(self.hvorb) > 10000
+            mTra  = mTra1 * ~mSub * ~mRid
+            mOth  = ~mSub * ~mRid
+            pbtype = np.zeros(self.lonb.shape,dtype=np.int32)
+            pbtype[mSub] = 1
+            pbtype[mRid] = 2
+            pbtype[mTra] = 3
+            pbtype[mOth] = 4
+            self.pbtype = pbtype
+            
+            # --- count
+            if len(pbtype) == 0:
+                sub=rid=tra=oth=np.nan
+                # rid=np.nan
+                # tra=np.nan
+                # oth=np.nan
+                self.im('pbtype is empty - no plate boundary detected! Returning NaNs.')
+            else:
+                self.im('Creat a mask to mask internal plate boundaries')
+                mask = np.ones(self.lonb.shape,dtype=bool)
+                for i in range(len(self.lonb)):
+                    if self.platecouple[i,0] == self.platecouple[i,1]:
+                        mask[i] = False
+                sub = np.count_nonzero(pbtype[mask] == 1)/len(pbtype[mask])
+                rid = np.count_nonzero(pbtype[mask] == 2)/len(pbtype[mask])
+                tra = np.count_nonzero(pbtype[mask] == 3)/len(pbtype[mask])
+                oth = np.count_nonzero(pbtype[mask] == 4)/len(pbtype[mask])
+                print('-'*30)
+                self.im('Automatic Plate boundary diagnostic: ALL PLATES')
+                self.im('Subduction: '+str(int(sub*10000)/100)+'%')
+                self.im('MOR:        '+str(int(rid*10000)/100)+'%')
+                self.im('Transform:  '+str(int(tra*10000)/100)+'%')
+                self.im('Other:      '+str(int(oth*10000)/100)+'%')
+            
+            # # Compute the heat flux
+            # depth_subsurf = 4.3*1000 # depth in meters
+            # k0 = 3.15 # W.m^{-1}.K^{-1}     # do we need 3.0 here (MARLA)?
+            # q0 = k0*(self.T-0.12)/depth_subsurf
+
+            # # compute a temp compositionary field: 1 if continent, 0 elsewhere - MARLA (don't have conts yet)
+            # COMPO = np.zeros(len(self.x),dtype=np.int32)
+            # COMPO[self.cont > 0] = 1
+            # # prepare indices
+            # ids = np.arange(len(self.x))
+            # subDir = np.zeros(len(pbtype),dtype=np.int32)-1
+            # for i in range(len(pbtype)):
+            #     if pbtype[i] == 1:
+            #         p1,p2 = self.platecouple[i]
+            #         ms1   = self.plateID  == p1
+            #         ms2   = self.plateID  == p2
+            #         dist1 = np.sqrt((self.xb[i]-self.x[ms1])**2+(self.yb[i]-self.y[ms1])**2+(self.zb[i]-self.z[ms1])**2)
+            #         dist2 = np.sqrt((self.xb[i]-self.x[ms2])**2+(self.yb[i]-self.y[ms2])**2+(self.zb[i]-self.z[ms2])**2)
+            #         maxDist = 0.035
+            #         mh1   = dist1 <= maxDist
+            #         mh2   = dist2 <= maxDist
+            #         if np.count_nonzero(mh1) == 0:
+            #             q01   = 0
+            #             comp1 = 0
+            #         else:
+            #             q01   = np.mean(q0[ids[ms1][mh1]])
+            #             comp1 = np.mean(COMPO[ids[ms1][mh1]])
+            #         if np.count_nonzero(mh2) == 0:
+            #             q02   = 0
+            #             comp2 = 0
+            #         else:
+            #             q02   = np.mean(q0[ids[ms2][mh2]])
+            #             comp2 = np.mean(COMPO[ids[ms2][mh2]])
+            #         if comp1 >= 0.75 and comp2 < 0.75:
+            #             subDir[i] = p2
+            #         elif comp2 >= 0.75 and comp1 < 0.75:
+            #             subDir[i] = p1
+            #         else:
+            #             if q01 >= q02:
+            #                 subDir[i] = p2
+            #             else:
+            #                 subDir[i] = p1
+                            
+            # # now cleaning ! Test all plate couples that have in common a subduction boundary and
+            # # and check if the solution is consistent and homogene for the entire plate boundary
+            # tested_couples = []
+            # bad_couples    = []
+            # #subDir_new = subDir.copy()
+            # subDir_new = np.zeros(len(pbtype),dtype=np.int32)-1
+            # for i in range(len(self.xb)):
+            #     couplei = list(self.platecouple[i,:])
+            #     if couplei not in tested_couples and couplei[::-1] not in tested_couples and \
+            #     couplei not in bad_couples    and couplei[::-1] not in bad_couples:
+            #         cp1 = couplei[0]
+            #         cp2 = couplei[1]
+            #         m11 = self.platecouple[:,0] == cp1
+            #         m12 = self.platecouple[:,1] == cp2
+            #         m21 = self.platecouple[:,0] == cp2
+            #         m22 = self.platecouple[:,1] == cp1
+            #         m   = m11*m12 + m21*m22
+            #         ms  = self.pbtype[m] == 1
+            #         if np.count_nonzero(ms) == 0:
+            #             bad_couples.append(couplei)
+            #         else:
+            #             tested_couples.append(couplei)
+            #             idb = np.arange(len(self.lonb))
+            #             subDirp1 = np.count_nonzero(subDir[idb[m][ms]] == cp1)/len(idb[m][ms])
+            #             subDirp2 = 1-subDirp1
+            #             if subDirp1 >= 0.75:
+            #                 # dominated by the subduction of the plate p1 beneath the plate p2
+            #                 subDir_new[idb[m][ms]] = cp1
+            #             elif subDirp2 >= 0.75:
+            #                 # dominated by the subduction of the plate p2 beneath the plate p1
+            #                 subDir_new[idb[m][ms]] = cp2
+
+            # subDir_old  = subDir.copy()
+            # self.subDir = subDir_new
+            
+            if plot:
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Plate boundary type',fontweight='bold', fontname='Georgia', fontsize=14)
+                ax.set_global()
+                #ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c='blue',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='red',alpha=1,transform=ccrs.PlateCarree())
+                #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='green',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                ax.legend(loc='lower left', labels=['Subduction','MOR','Other'])
+                plt.show()
+                #
+                # fig = plt.figure()
+                # ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                # ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITHOUT cleaning')
+                # ax.set_global()
+                # ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                # # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_old[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                # #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                # plt.show()
+                #
+                # fig = plt.figure()
+                # ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                # ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITH cleaning')
+                # ax.set_global()
+                # ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                # # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_new[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                # #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                # plt.show()
+
+            if plateID is not None:
+                mp1 = self.platecouple[:,0] == plateID
+                mp2 = self.platecouple[:,1] == plateID
+                mp  = mp1 + mp2
+                mask = np.ones(self.lonb[mp].shape,dtype=bool)
+                for i in range(len(self.lonb[mp])):
+                    if self.platecouple[:,0][mp][i] == self.platecouple[:,1][mp][i]:
+                        mask[i] = False
+                pbtypei = pbtype[mp][mask]
+                sub = np.count_nonzero(pbtypei == 1)/len(pbtypei)
+                rid = np.count_nonzero(pbtypei == 2)/len(pbtypei)
+                tra = np.count_nonzero(pbtypei == 3)/len(pbtypei)
+                oth = np.count_nonzero(pbtypei == 4)/len(pbtypei)
+                print('-'*30)
+                self.im('Automatic Plate boundary diagnostic: pID='+str(plateID))
+                self.im('Subduction: '+str(int(sub*10000)/100)+'%')
+                self.im('MOR:        '+str(int(rid*10000)/100)+'%')
+                self.im('Transform:  '+str(int(tra*10000)/100)+'%')
+                self.im('Other:      '+str(int(oth*10000)/100)+'%')
+            
+            return sub,rid,tra,oth
+
+    def boundariesDiagnotic(self,plateID=None,plot=False):
+        """
+        This function returns of an automatic diagnotic on the plate
+        boundary type and fill the internal field .btype that have the
+        same lenght as self.lonb.
+        NOTE 1: You have to have import before vorticity, divergence data,
+                temperature and continental composition data.
+        NOTE 2: You can give a plate ID value to have a verbose diagnostic on
+                a particular plate.
+        """
+        if len(self.hvorb) != len(self.lonb):
+            self.im('You have to import vorticity data before',error=True)
+        elif len(self.hdivb) != len(self.lonb):
+            self.im('You have to import divergence data before',error=True)
+        elif len(self.Tb) != len(self.lonb):
+            self.im('You have to import temperature data before',error=True)
+        else:
+            self.im('Automatic plates boundaries diagnostic')
+            mSub1 = self.hdivb < -1000
+            mSub2 = self.vrb < -50
+            mSub  = mSub1 * mSub2
+            mRid1 = self.hdivb > +1000
+            mRid2 = self.vrb > +50
+            mRid  = mRid1 * mRid2
+            mTra1 = abs(self.hvorb) > 10000
+            mTra  = mTra1 * ~mSub * ~mRid
+            mOth  = ~mTra * ~mSub * ~mRid
+            pbtype = np.zeros(self.lonb.shape,dtype=np.int32)
+            pbtype[mSub] = 1
+            pbtype[mRid] = 2
+            pbtype[mTra] = 3
+            pbtype[mOth] = 4
+            self.pbtype = pbtype
+            self.im('Creat a mask to mask internal plate bounaries')
+            mask = np.ones(self.lonb.shape,dtype=bool)
+            for i in range(len(self.lonb)):
+                if self.platecouple[i,0] == self.platecouple[i,1]:
+                    mask[i] = False
+            # --- count
+            sub = np.count_nonzero(pbtype[mask] == 1)/len(pbtype[mask])
+            rid = np.count_nonzero(pbtype[mask] == 2)/len(pbtype[mask])
+            tra = np.count_nonzero(pbtype[mask] == 3)/len(pbtype[mask])
+            oth = np.count_nonzero(pbtype[mask] == 4)/len(pbtype[mask])
+            print('-'*30)
+            self.im('Automatic Plate boundary diagnostic: ALL PLATES')
+            self.im('Subduction: '+str(int(sub*10000)/100)+'%')
+            self.im('MOR:        '+str(int(rid*10000)/100)+'%')
+            self.im('Transform:  '+str(int(tra*10000)/100)+'%')
+            self.im('Other:      '+str(int(oth*10000)/100)+'%')
+            # Compute the heat flux
+            depth_subsurf = 3.2*1000 # depth in meters
+            k0 = 3.15 # W.m^{-1}.K^{-1}
+            q0 = k0*(self.T-0.12)/depth_subsurf
+            # compute a temp compositionary field: 1 if continent, 0 elsewhere
+            COMPO = np.zeros(len(self.x),dtype=np.int32)
+            COMPO[self.cont > 0] = 1
+            # prepare indices
+            ids = np.arange(len(self.x))
+            subDir = np.zeros(len(pbtype),dtype=np.int32)-1
+            for i in range(len(pbtype)):
+                if pbtype[i] == 1:
+                    p1,p2 = self.platecouple[i]
+                    ms1   = self.plateID  == p1
+                    ms2   = self.plateID  == p2
+                    dist1 = np.sqrt((self.xb[i]-self.x[ms1])**2+(self.yb[i]-self.y[ms1])**2+(self.zb[i]-self.z[ms1])**2)
+                    dist2 = np.sqrt((self.xb[i]-self.x[ms2])**2+(self.yb[i]-self.y[ms2])**2+(self.zb[i]-self.z[ms2])**2)
+                    maxDist = 0.035
+                    mh1   = dist1 <= maxDist
+                    mh2   = dist2 <= maxDist
+                    if np.count_nonzero(mh1) == 0:
+                        q01   = 0
+                        comp1 = 0
+                    else:
+                        q01   = np.mean(q0[ids[ms1][mh1]])
+                        comp1 = np.mean(COMPO[ids[ms1][mh1]])
+                    if np.count_nonzero(mh2) == 0:
+                        q02   = 0
+                        comp2 = 0
+                    else:
+                        q02   = np.mean(q0[ids[ms2][mh2]])
+                        comp2 = np.mean(COMPO[ids[ms2][mh2]])
+                    if comp1 >= 0.75 and comp2 < 0.75:
+                        subDir[i] = p2
+                    elif comp2 >= 0.75 and comp1 < 0.75:
+                        subDir[i] = p1
+                    else:
+                        if q01 >= q02:
+                            subDir[i] = p2
+                        else:
+                            subDir[i] = p1
+                            
+            # now cleaning ! Test all plate couples that have in common a subduction boundary and
+            # and check if the solution is consistent and homogene for the entire plate boundary
+            tested_couples = []
+            bad_couples    = []
+            subDir_new = subDir.copy()
+            for i in range(len(self.xb)):
+                couplei = list(self.platecouple[i,:])
+                if couplei not in tested_couples and couplei[::-1] not in tested_couples and \
+                couplei not in bad_couples    and couplei[::-1] not in bad_couples:
+                    cp1 = couplei[0]
+                    cp2 = couplei[1]
+                    m11 = self.platecouple[:,0] == cp1
+                    m12 = self.platecouple[:,1] == cp2
+                    m21 = self.platecouple[:,0] == cp2
+                    m22 = self.platecouple[:,1] == cp1
+                    m   = m11*m12 + m21*m22
+                    ms  = self.pbtype[m] == 1
+                    if np.count_nonzero(ms) == 0:
+                        bad_couples.append(couplei)
+                    else:
+                        tested_couples.append(couplei)
+                        idb = np.arange(len(self.lonb))
+                        subDirp1 = np.count_nonzero(subDir[idb[m][ms]] == cp1)/len(idb[m][ms])
+                        subDirp2 = 1-subDirp1
+                        if subDirp1 >= 0.75:
+                            # dominated by the subduction of the plate p1 beneath the plate p2
+                            subDir_new[idb[m][ms]] = cp1
+                        elif subDirp2 >= 0.75:
+                            # dominated by the subduction of the plate p2 beneath the plate p1
+                            subDir_new[idb[m][ms]] = cp2
+
+            subDir_old  = subDir.copy()
+            self.subDir = subDir_new
+            
+            if plot:
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Diagnostic on the plate boundaries: All bounaries')
+                ax.set_global()
+                #ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c='blue',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='red',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='green',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                plt.show()
+                #
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITHOUT cleaning')
+                ax.set_global()
+                ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_old[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                plt.show()
+                #
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITH cleaning')
+                ax.set_global()
+                ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_new[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                plt.show()
+
+            if plateID is not None:
+                mp1 = self.platecouple[:,0] == plateID
+                mp2 = self.platecouple[:,1] == plateID
+                mp  = mp1 + mp2
+                mask = np.ones(self.lonb[mp].shape,dtype=bool)
+                for i in range(len(self.lonb[mp])):
+                    if self.platecouple[:,0][mp][i] == self.platecouple[:,1][mp][i]:
+                        mask[i] = False
+                pbtypei = pbtype[mp][mask]
+                sub = np.count_nonzero(pbtypei == 1)/len(pbtypei)
+                rid = np.count_nonzero(pbtypei == 2)/len(pbtypei)
+                tra = np.count_nonzero(pbtypei == 3)/len(pbtypei)
+                oth = np.count_nonzero(pbtypei == 4)/len(pbtypei)
+                print('-'*30)
+                self.im('Automatic Plate boundary diagnostic: pID='+str(plateID))
+                self.im('Subduction: '+str(int(sub*10000)/100)+'%')
+                self.im('MOR:        '+str(int(rid*10000)/100)+'%')
+                self.im('Transform:  '+str(int(tra*10000)/100)+'%')
+                self.im('Other:      '+str(int(oth*10000)/100)+'%')

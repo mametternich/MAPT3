@@ -37,12 +37,6 @@ plotPlateSizeDistribution = True
 # ---- 1. Tessellation description
 
 path  = './OPTIMIZED/'
-# file  = 'AGE467-555_llsvp_vp00071_optimized.h5'
-# file  = 'freeCys50_00500_optimized.h5'
-# file  = 'freeDys30-sid_00670_optimized.h5'
-# file  = 'freeDys30-sid_01045_optimized.h5'
-# file  = 'freeDys20_eta20-sid_00750_optimized.h5'
-# file  = 'fDys50_00600_optimized.h5'
 file = 'fDys30-sc_01045_optimized.h5'
 
 # ---- 2. Creat the PlateGather object
@@ -89,8 +83,6 @@ ax = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
 ax.set_global()
 cmap = ax.scatter(pg.lon,pg.lat,c=pg.plateID,s=1,cmap=plt.cm.magma,transform=ccrs.PlateCarree())
 mask = pg.plateID == plot_pid
-print('MARLA size plateID = ', pg.plateID.shape)
-print('MARLA size mask = ', np.sum(mask))
 ax.scatter(pg.lon[mask], pg.lat[mask], s=6, c='cyan', transform=ccrs.PlateCarree(), label=f'Plate {plot_pid}')
 cbar = fig.colorbar(cmap,ax=ax,orientation='horizontal', pad=0.05, shrink=0.8)
 ax.legend(loc='lower left')

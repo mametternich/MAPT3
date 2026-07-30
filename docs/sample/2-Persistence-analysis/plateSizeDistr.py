@@ -213,16 +213,6 @@ def format_frame_list(frames_to_format, width=5):
 
 path  = './OPTIMIZED/'
 # models = ['fDys20-sc','fDys30-sc','fDys50-sc','fDys20_eta20-sc','fDys30_eta20-sc','fDys50_eta20-sc']
-# models = ['fDys20-sc','Dys20','fDys30-sc','Dys30','fDys40-sc','Dys40-sc','fDys50-sc','Dys50']
-# models = ['fDys20-sc','Dys20-sc','fDys30-sc','Dys30-sc','fDys40-sc','Dys40-sc','fDys50-sc','Dys50-sc']
-# models = ['fDys20_eta20-sc','Dys20_eta20-sc','fDys30_eta20-sc','Dys30_eta20-sc','fDys40_eta20-sc','Dys40_eta20-sc','fDys50_eta20-sc','Dys50_eta20-sc']
-# models = ['fDys20-ysg-sc','Dys20-sc','fDys30-ysg-sc','Dys30-sc','fDys40-ysg-sc','Dys40-sc','fDys50-ysg-sc','Dys50-sc']
-# models = ['fDys20_eta20-ysg-sc','Dys20_eta20-sc','fDys30_eta20-ysg-sc','Dys30_eta20-sc','fDys40_eta20-ysg-sc','Dys40_eta20-sc','fDys50_eta20-ysg-sc','Dys50_eta20-sc']
-# models = ['fDys20-sc','fDys30-sc','fDys50-sc','fDys20-ysg-sc','fDys30-ysg-sc','fDys50-ysg-sc']
-# models = ['fDys20','Dys20-sc','fDys30-fromstart','Dys30-sc','fDys40-sc','Dys40-sc','fDys50','Dys50-sc']
-# models = ['fDys30-fromstart', 'fDys30-r']
-# models = ['fDys30_eta20-ysg-sc', 'fDys50_eta20-ysg-sc']
-# models = ['fDys20-sc', 'Dys20', 'fDys30-sc','Dys30', 'fDys50-sc','Dys50']
 models = ['fDys50']
 
 # Set allframes to True to automatically detect all available frames,
@@ -232,10 +222,6 @@ plotSpread = False
 WSD_to_imposed_models = False
 plot_CCDF_PDF_together = False
 # frames = [720, 740, 760, 780, 800, 820, 840, 860, 880, 900]
-# frames = [1066, 1045, 1032,1071,1055, 1039]
-# frames = [1066,1054,1045,1045,1017,1012,1032,1032]
-# frames = [1052,1054,1027,1045,1017,1012,1032,1032]
-# frames = [1066, 1045, 1032, 1071, 1045, 1032]
 frames = [860]
 
 # Some checks

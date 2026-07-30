@@ -28,7 +28,6 @@ from MAPT3.tessellation import PlateGather
 path  = './OPTIMIZED/'
 drive = '/Volumes/MarsBook'
 models = ['fDys50-sc']
-# models = ['fDys20-sc', 'Dys20', 'fDys30-sc','Dys30', 'fDys50-sc','Dys50']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below
@@ -73,7 +72,7 @@ else:
 
 output_dir = os.path.expanduser('~/Documents/Earth/Figures/PlateBoundaries/')
 
-print('MARLA iteration = ', called_pairs)
+print('iteration = ', called_pairs)
 # ---- Calculate types of boundaries for each frame and model
 model_to_idx = {m: j for j, m in enumerate(models)}
 frac_sum_by_model = np.zeros((4, len(models)))
@@ -105,12 +104,6 @@ for i, (model_name, frame) in enumerate(called_pairs):
     if len(pg.vrb) == len(pg.lonb) and np.count_nonzero(pg.vrb) == 0:
         points = np.column_stack((pg.lon, pg.lat))
         pg.vrb = griddata(points, pg.vr, (pg.lonb, pg.latb), method='nearest')
-
-    # Testing only
-    # print('   min, max divergence: ', np.min(pg.hdivb), np.max(pg.hdivb))
-    # print('   min, max vorticity: ', np.min(pg.hvorb), np.max(pg.hvorb))
-    # print('   min, max radial velocity: ', np.min(pg.vr), np.max(pg.vr))
-    # print('   min, max radial velocity at boundaries: ', np.min(pg.vrb), np.max(pg.vrb))
 
     if len(pg.vrb) > 0:
         # Plotting the divergence and vorticity on the plate boundaries

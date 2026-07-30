@@ -27,6 +27,7 @@ from .kinematics import cartfipole
 from .geotransform import xyz2latlon, latlon2xyz, latlon2UTM, sweeplat2north, sweeplat2south
 from .errors import OptimizationError, OptimizationSettingsError, SizeError
 from .rigidity import dracoParcellationFragmenter
+from .rigidity import rigid as rigid_rigidity  # Use alias to avoid conflict - MARLA
 from .compute import clustering
 from .project import Project
 from .io import surface2VTK
@@ -457,8 +458,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
              simplex_threshold = 0.01, hidden = True,\
              alpha_init = 90, alpha_search_step = 10, convergeThreshold = 3,\
              plot_missed = False, plot = True, plot_rigidity = False,\
-             saf = 1.5, eaf = 1, baf = 1,\
-             verbose=False, verbose_rigidity=False, verbose_edgesExtraction=False):
+             saf = 1.5, eaf = 1, baf = 10,\
+             verbose=False, verbose_rigidity=False, verbose_edgesExtraction=False,fig_path='./'):
     """
     Optimization of the tessellation at a given time step. Combine multiple
     tessellations computed with different value of pmin (minimum persistence
@@ -616,6 +617,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
     plateID     = np.zeros(len(lon),dtype=np.int32)-1   # ID of the plate kept in the optimized model (before the re-indexing)
     persistence = np.zeros(len(lon),dtype=np.float64)-1 # highest persistence to have a rigid plate 
     rigidity    = np.zeros(len(lon),dtype=bool)         # True if rigid
+    realrigidity= np.zeros(len(lon),dtype=bool)         # True if rigid without overlap regions # MARLA
+    rigidrigidity= np.zeros(len(lon),dtype=bool)        # True if rigid as per rigidity.rigid (external) # MARLA
     nPlateID    = np.zeros(len(lon),dtype=np.int32)     # New plate ID
     missedPlates= np.zeros(len(lon),dtype=np.int32)     # Map of the points that are missed by the optimization due to overlapping issues
     trackedFF   = np.zeros(len(lon),dtype=bool)         # Map of points affected by an overlapping and affected by a forced flexible
@@ -675,6 +678,7 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
             if rotPoleCompute['p'+str(my_loc_pmin)][str(pID)] == 0:     # rot pole inversion undone yet
                 ref.get_rotation(pID,plot=False,r=r)
                 local_rigidity = rigid(ref,Project.fragment_size,verbose=verbose_rigidity,plot=plot_rigidity)
+                local_rigidrigidity = rigid_rigidity(ref,pID,ref.wx1,ref.wy1,ref.wz1,ref.P11,ref.P12,plot=plot_rigidity) # MARLA
                 if local_rigidity:
                     rotPoleCompute['p'+str(my_loc_pmin)][str(pID)] = 2
                 else:
@@ -693,6 +697,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                     plateID[ids]     = pID
                     persistence[ids] = pmin_ref
                     rigidity[ids]    = True
+                    realrigidity[ids]= True # MARLA
+                    rigidrigidity[ids]= local_rigidrigidity # MARLA
                     nPlateID[ids]    = n
                     # --- Restart the persistence search from the top
                     restart_at_pmin  = None
@@ -717,6 +723,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                         plateID[noids]     = 999999   # will be not found in a PlateGather object
                         persistence[noids] = 999999   # easily tracked in persistence
                         rigidity[noids]    = False
+                        realrigidity[noids]= True # MARLA
+                        rigidrigidity[noids] = local_rigidrigidity # MARLA
                         nPlateID[noids]    = n
                         # --- Restart the persistence search from the top
                         restart_at_pmin  = None
@@ -780,6 +788,7 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                                 if rotPoleCompute['p'+str(my_loc_pmin)][str(pIDloc)] == 0:     # rot pole inversion undone yet
                                     pg.get_rotation(pIDloc,plot=False,r=r)
                                     local_rigidity_loc = rigid(pg,Project.fragment_size,verbose=verbose_rigidity,plot=plot_rigidity)
+                                    local_rigidrigidity_loc = rigid_rigidity(ref,pID,ref.wx1,ref.wy1,ref.wz1,ref.P11,ref.P12,plot=plot_rigidity) # MARLA
                                     if local_rigidity_loc:
                                         rotPoleCompute['p'+str(my_loc_pmin)][str(pIDloc)] = 2
                                     else:
@@ -806,6 +815,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                                         plateID[ids]     = pIDloc
                                         persistence[ids] = pmin
                                         rigidity[ids]    = True
+                                        realrigidity[ids]= True # MARLA
+                                        rigidrigidity[ids] = local_rigidrigidity_loc # MARLA
                                         nPlateID[ids]    = n
                                         # --- Restart the persistence search from the top
                                         restart_at_pmin  = None
@@ -828,6 +839,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                                             plateID[noids]     = 999999   # will be not found in a PlateGather object
                                             persistence[noids] = 999999   # easily tracked in persistence
                                             rigidity[noids]    = False
+                                            realrigidity[noids]= True # MARLA
+                                            rigidrigidity[noids] = local_rigidrigidity_loc # MARLA
                                             nPlateID[noids]    = n
                                             # --- Restart the persistence search from the top
                                             restart_at_pmin  = None
@@ -854,6 +867,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                                     plateID[ids]     = pIDloc
                                     persistence[ids] = pmin
                                     rigidity[ids]    = False
+                                    realrigidity[ids]= False # MARLA
+                                    rigidrigidity[ids] = False # MARLA
                                     nPlateID[ids]    = n
                                     # --- Restart the persistence search from the top
                                     restart_at_pmin  = None
@@ -866,6 +881,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                                     plateID[noids]      = 999999    # will be not found in a PlateGather object
                                     persistence[noids]  = 999999    # easily tracked in persistence
                                     rigidity[noids]     = False
+                                    realrigidity[noids] = False # MARLA
+                                    rigidrigidity[noids] = False # MARLA
                                     nPlateID[noids]     = n
                                     # --- Restart the persistence search from the top
                                     restart_at_pmin  = None
@@ -880,6 +897,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                             plateID[ids]     = 999999   # will be not found in a PlateGather object
                             persistence[ids] = pmin
                             rigidity[ids]    = False
+                            realrigidity[ids]= False # MARLA
+                            rigidrigidity[ids] = False # MARLA
                             nPlateID[ids]    = n
                             # --- as it failed because the ref point does not exist at this persistence, restart at the same persistence but with the next point
                             restart_at_pmin  = pmin_ref_ID_loc # ID on the list pthreshold
@@ -902,6 +921,7 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                         if rotPoleCompute['p'+str(my_loc_pmin)][str(pIDloc)] == 0:     # rot pole inversion undone yet
                             pg.get_rotation(pIDloc,plot=False,r=r)
                             local_rigidity_loc = rigid(pg,Project.fragment_size,verbose=verbose_rigidity,plot=plot_rigidity)
+                            local_rigidrigidity_loc = rigid_rigidity(ref,pID,ref.wx1,ref.wy1,ref.wz1,ref.P11,ref.P12,plot=plot_rigidity) # MARLA
                             if local_rigidity_loc:
                                 rotPoleCompute['p'+str(my_loc_pmin)][str(pIDloc)] = 2
                             else:
@@ -925,6 +945,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                             plateID[ids]     = pIDloc
                             persistence[ids] = pmin
                             rigidity[ids]    = False
+                            realrigidity[ids]= False # MARLA
+                            rigidrigidity[ids] = False # MARLA
                             nPlateID[ids]    = n
                             # --- Restart the persistence search from the top
                             restart_at_pmin  = None
@@ -937,6 +959,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                             plateID[noids]     = 999999   # will be not found in a PlateGather object
                             persistence[noids] = 999999   # easily tracked in persistence
                             rigidity[noids]    = False
+                            realrigidity[noids]= False # MARLA
+                            rigidrigidity[noids] = False # MARLA
                             nPlateID[noids]    = n
                             # --- Restart the persistence search from the top
                             restart_at_pmin  = None
@@ -958,6 +982,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                 plateID[ids]     = pID
                 persistence[ids] = pmin_ref
                 rigidity[ids]    = False
+                realrigidity[ids]= False # MARLA
+                rigidrigidity[ids] = False # MARLA
                 nPlateID[ids]    = n
                 # --- Restart the persistence search from the top
                 restart_at_pmin  = None
@@ -970,6 +996,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
                 plateID[noids]     = 999999   # will be not found in a PlateGather object
                 persistence[noids] = 999999   # easily tracked in persistence
                 rigidity[noids]    = False
+                realrigidity[noids]= False # MARLA
+                rigidrigidity[noids] = False # MARLA
                 nPlateID[noids]    = n
                 # --- Restart the persistence search from the top
                 restart_at_pmin  = None
@@ -1019,6 +1047,8 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
     dset = fid.create_dataset('nPlateID',     data = nPlateID_rescaled)
     dset = fid.create_dataset('persistence',  data = persistence)
     dset = fid.create_dataset('rigidity',     data = rigidity)
+    dset = fid.create_dataset('realrigidity', data = realrigidity) # MARLA
+    dset = fid.create_dataset('rigidrigidity', data = rigidrigidity) # MARLA: external rigidity.rigid result
     dset = fid.create_dataset('missedPlates', data = missedPlates)
     dset = fid.create_dataset('trackedFF',    data = trackedFF)
     dset = fid.create_dataset('missedPlates_pmin', data = missedPlates_pmin)
@@ -1049,7 +1079,7 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
         # ---
         ax2.set_title('Persistence')
         ax2.set_global()
-        cmap2 = ax2.scatter(lon,lat,c=persistence,s=1,vmin=pthreshold[0],vmax=pthreshold[pmin_ref_ID],cmap=plt.cm.magma,transform=ccrs.PlateCarree())
+        cmap2 = ax2.scatter(lon,lat,c=persistence,s=1,vmin=pthreshold[0],vmax=1000,cmap=plt.cm.magma,transform=ccrs.PlateCarree())
         cbar2 = fig.colorbar(cmap2,ax=ax2,orientation='horizontal')
         # ---
         ax3.set_title('Rigidity')
@@ -1057,9 +1087,13 @@ def optimize(path2h5file, pthreshold, ofile, output_path='./', small_plate = Pro
         cmap3 = ax3.scatter(lon,lat,c=rigidity,s=1,cmap=plt.cm.magma,transform=ccrs.PlateCarree())
         cbar3 = fig.colorbar(cmap3,ax=ax3,orientation='horizontal')
         plt.tight_layout()
-        plt.show()
+        # plt.show()
+        plt.savefig(fig_path+ofile+'_overview.png',dpi=200) 
+        print(' Figure saved: '+fig_path+ofile+'_overview.png') 
+        plt.close() 
 
     # --- Build the optimal PlateGather instance ---------------------------------
+    print('MARLA - length persistence array: ',len(persistence))
 
     optimize_from_param(path2h5,path2h5file,ofile,output_path=output_path,verbose=verbose,\
                         plot_missed = plot_missed, add_missedPlates = add_missedPlates,\
@@ -1127,6 +1161,8 @@ def optimize_from_param(path2param, path2h5file, ofile, output_path='./', \
     nPlateID_rescaled = np.array(fid['nPlateID'])
     persistence       = np.array(fid['persistence'])
     rigidity          = np.array(fid['rigidity'])
+    realrigidity      = np.array(fid['realrigidity']) # MARLA
+    rigidrigidity     = np.array(fid['rigidrigidity']) # MARLA
     missedPlates      = np.array(fid['missedPlates'])
     missedPlates_pmin = np.array(fid['missedPlates_pmin'])
     fid.close()
@@ -1708,7 +1744,9 @@ def optimize_from_param(path2param, path2h5file, ofile, output_path='./', \
     
     print()
     print('-------')
-    print('Surface of non-rigid area: '+str(int(10000*(rigidity.shape[0]-np.count_nonzero(rigidity))/rigidity.shape[0])/100)+'%')
+    print('Surface of non-rigid area (rigidity): '+str(int(10000*(rigidity.shape[0]-np.count_nonzero(rigidity))/rigidity.shape[0])/100)+'%') 
+    print('Surface of non-rigid area (realrigidity): '+str(int(10000*(realrigidity.shape[0]-np.count_nonzero(realrigidity))/realrigidity.shape[0])/100)+'%') # MARLA
+    print('Surface of non-rigid area (rigidrigidity): '+str(int(10000*(rigidrigidity.shape[0]-np.count_nonzero(rigidrigidity))/rigidrigidity.shape[0])/100)+'%') # MARLA
     print('  -> Add non-rigid areas')
     mnr = rigidity == False
     
@@ -1731,7 +1769,12 @@ def optimize_from_param(path2param, path2h5file, ofile, output_path='./', \
     opti.rnr = ref.r[mnr]
         
     # -.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-
+    print()
+    print('-------')
+    print('Minimum persistence used: '+str(np.min(persistence[persistence!=999999])))
+    print('Maximum persistence used: '+str(np.max(persistence[persistence!=999999])))
 
+    # -.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-
     print()
     print('-------')
     print('Deallocate the unused memory')
@@ -1873,6 +1916,7 @@ def optimize_from_param(path2param, path2h5file, ofile, output_path='./', \
     print('-'*50)
     path2h5 = output_path+ofile+'_optimized.h5'
     opti.export2h5(path2h5)
+
 
 
 

@@ -76,7 +76,7 @@ def clustering(threshold,x,y,z):
     return cluster, output
 
 
-def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verbose=False):
+def distribution(data,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',interval='log',plot=False,verbose=False):
     """
     Function computing and returning the cumulative, inverse
     cumulative and PDF representing the distribution of an
@@ -109,9 +109,10 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verb
     
     Returns:
         bins (numpy.ndarray): used binning
-        cumsumS (numpy.ndarray): resulting inverse cumulative
-        cumul (numpy.ndarray): resulting cumulative (derived from cumsumS)
-        pdf (numpy.ndarray): resulting PDF (derived from cumsumS)
+        invcumul (numpy.ndarray): resulting inverse cumulative
+        cumul (numpy.ndarray): resulting cumulative (derived from invcumul)
+        pdf (numpy.ndarray): resulting PDF (derived from invcumul)
+        pdfBird (numpy.ndarray): Bird 2003 Earth plate size PDF (if earthSizeDistriFile is provided)
     """
     # sort the data
     sorted_data = np.sort(data)
@@ -123,7 +124,7 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verb
         pass
     else:
         raise ValueError('Unknown value for "small". "small" must be either an integer, a float number of "auto".')
-
+    
     # def the binning that will be used
     if isinstance(binning,str):
         if binning == 'lin':
@@ -155,21 +156,61 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verb
         print('ERROR: Unrecognized binning method')
         raise ValueError()
 
-    # compute the inverse cumulative
-    cumsumS = np.zeros(nbins, dtype=np.float64)
+    # compute the inverse cumulative distribution
+    invcumul = np.zeros(nbins, dtype=np.float64)
     for i in range(nbins):
-        cumsumS[i] = len(np.where(data >= bins[i])[0])
+        invcumul[i] = len(np.where(data >= bins[i])[0])
 
-    # compute the pdf by derivation of the cumulative
-    cumul = np.amax(cumsumS) - cumsumS	# represents the true cumulative
+    # compute the pdf by derivation of the inverse cumulative
     pdf   = np.zeros(nbins-1,dtype=np.float64)
-    norm  = 0  # norm of the pdf
+    norm = 0.
     for i in range(nbins-1):
-        dN = abs(cumul[i+1] - cumul[i])
-        dS = abs(bins[i+1] - bins[i])
+        dN = invcumul[i] - invcumul[i+1]
+        dS = bins[i+1] - bins[i]
         pdf[i] = dN / dS
-        norm += pdf[i] * dS
-    pdf = pdf/norm  # normalize the pdf to have: \int_-inf^+inf pdf(s) ds = 1
+        norm += dN
+    pdf /= norm # normalize the pdf to have: \int_-inf^+inf pdf(s) ds = 1
+
+# --- Bird 2003
+    # interval = 'log'  # choose interval 'raw', 'log' or 'normal'
+    #     The argument interval is a string that command the different type of possible
+    # plate size intervals:
+    #         - interval = 'raw'    -> the list of plate size is just np.unique(self.surfdim)
+    #         - interval = 'normal' -> generated in the normal space and cover the range of plate size
+    #         - interval = 'log'    -> [Default] generated in the log space and cover the range of plate size
+    earthPlateSurf = np.load(earthSizeDistriFile)
+    earthPlateSurf = earthPlateSurf * 6371**2  # conversion to km^2
+
+    if interval == 'normal':
+        bins_Bird = np.linspace(100, int(np.amax(earthPlateSurf)+10), 1000)
+    elif interval == 'log':
+        bins_Bird = np.logspace(np.log10(100), np.log10(int(np.amax(earthPlateSurf)+10)), nbins) 
+    elif interval == 'raw':
+        bins_Bird = np.unique(earthPlateSurf)
+
+    nodBird = len(bins_Bird)
+    invcumulcountEP = np.zeros(nodBird)
+    for i in range(nodBird):
+        invcumulcountEP[i] = len(np.where(earthPlateSurf >= bins_Bird[i])[0])
+
+    # also inverse cumulative Bird data
+    if interval != 'raw':
+        ind = np.arange(nodBird)
+        mloc = invcumulcountEP == invcumulcountEP[0]
+        cumul_Bird = invcumulcountEP[ind[mloc][-1]:nodBird]
+        cumul_bins_Bird = bins_Bird[ind[mloc][-1]:nodBird]
+    else:
+        cumul_Bird = invcumulcountEP
+        cumul_bins_Bird = bins_Bird
+
+    pdfBird = np.zeros(nodBird-1, dtype=np.float64)
+    normBird = 0.
+    for i in range(nodBird-1):
+        dN = invcumulcountEP[i] - invcumulcountEP[i+1]
+        dS = bins_Bird[i+1] - bins_Bird[i]
+        pdfBird[i] = dN / dS
+        normBird += dN
+    pdfBird /= normBird  # normalize
 
     # Plot the PDF
     if plot:
@@ -180,14 +221,30 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verb
         # Figure
         fig = plt.figure(figsize=(8, 6))
         ax  = fig.add_subplot(111)
-        ax.plot(midpoints, pdf, marker='o', linestyle='-', color='r')
+        # plot model pdf (density per unit of data)
+        ax.plot(midpoints, pdf, marker='o', linestyle='-', color='k', label='Model PDF')
+
+        # Plot Bird 2003 as a PDF (normalized) using midpoints of bins_Bird
+        # Note: pdfBird is computed on intervals defined by bins_Bird (length nodBird-1)
+        if earthSizeDistriFile is not None and 'pdfBird' in locals() and pdfBird is not None:
+            if len(bins_Bird) >= 2:
+                bins_Bird_mid = (bins_Bird[:-1] + bins_Bird[1:]) / 2.0
+
+                # avoid plotting zeros on log scale
+                # mask = ~np.isnan(pdfBird) & (pdfBird > 0)
+                # if np.any(mask):
+                    # ax.plot(bins_Bird_mid[mask], pdfBird[mask], marker='o', linestyle='-', c='r', linewidth=2, label='Bird 2003 PDF')
+                ax.plot(bins_Bird_mid, pdfBird, marker='o', linestyle='-', c='r', linewidth=2, label='Bird 2003 PDF')
+
         ax.set_title('Probability Density Function')
         ax.set_xlabel('Data Value')
         ax.set_ylabel('Probability Density')
         ax.grid(True)
         if binning == 'log':
             ax.set_xscale('log')
+            # PDF values often span many orders of magnitude; enable log on y if it makes sense
             ax.set_yscale('log')
+        ax.legend(loc='best')
         plt.show()
 
     # verify the intergal of the pdf
@@ -199,4 +256,7 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',plot=False,verb
         print('Check: intergral PDF = ',integral_pdf)
     
     # return bins, inverse cumulative, cumulative, PDF
-    return bins, cumsumS, cumul, pdf
+    if earthSizeDistriFile is not None and 'pdfBird' in locals() and pdfBird is not None:
+        return bins, invcumul, pdf, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird
+    else:
+        return bins, invcumul, pdf, None, None, None, None

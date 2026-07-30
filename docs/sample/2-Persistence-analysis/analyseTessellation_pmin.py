@@ -32,9 +32,6 @@ Project.set('../myparameters.py')
 pmin = 1000
 
 path  = '../1-Tessellation/TTK_outputs/'+'p'+intstringer(round(pmin),5)+'/'
-# file  = 'AGE467-555_llsvp_vp00071.h5'
-# file  = 'freeDys30-sid_00670.h5'
-# file  = 'freeDys30-sid_01045.h5'
 # file = 'fDys20_eta20_00500.h5'
 file  = 'fDys30_01045.h5'
 # file  = 'Dys30_00900.h5'

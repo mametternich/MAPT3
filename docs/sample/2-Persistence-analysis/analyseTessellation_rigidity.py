@@ -21,8 +21,6 @@ Project.set('../myparameters.py')
 pthreshold = Project.pmin # here, all the values used for the tessellation
 
 # Models to plot
-# models = ['Dys30','Dys30_eta20']
-# # frames = [826,1052]
 models = ['fDys30-fromstart']
 frames = [1027]
 

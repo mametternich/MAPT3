@@ -22,18 +22,12 @@ Project.set('../myparameters.py')
 
 # -----------------------------------------------------------------------------
 # # Define the models to loop over
-# models = ['fDys20_eta20-ysg-sc', 'fDys30_eta20-ysg-sc', 'fDys50_eta20-ysg-sc']
-# models = ['fDys20-ysg-sc', 'fDys20_eta20-ysg-sc']
-# models = ['fDys30-ysg-sc', 'fDys50-ysg-sc']
-# models = ['Dys20-sc','Dys20_eta20-sc','Dys30-sc','Dys30_eta20-sc','Dys40_eta20-sc','Dys50-sc','Dys50_eta20-sc']
-models = ['fDys50']
+models = ['fDys20-sc', 'fDys20_eta20-sc']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below
 allframes = True
-
-# frames = [920, 940, 960, 980, 1000, 1020, 1040, 1053] 
-# frames = [1032,1066]
+frames = [1032,1066]
 
 plotOneModel = True
 if not allframes and len(models)<len(frames): plotOneModel = True  # plots multiple time steps for 1 model only
@@ -81,10 +75,6 @@ for model_name, frame in model_frame_pairs:
     # DEFINE THE VARIABLE 'xdmffname'
     #  -> corresponding to the VTK file for the tessellation
 
-    # xdmffname = projPath+'/XDMF-H5/AGE467-555_llsvp_vp00071.xdmf'
-    # xdmffname = projPath+'/XDMF-H5/freeDys50_00800.xdmf'
-    # xdmffname = projPath+'/XDMF-H5/freeDys30-sid_00670.xdmf'
-    # xdmffname = projPath+'/XDMF-H5/fDys50_00660.xdmf'
     xdmffname = f'{projPath}/XDMF-H5/{model_name}_{frame:05d}.xdmf'
 
     # -----------------------------------------------------------------------------
