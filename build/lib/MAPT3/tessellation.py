@@ -6,6 +6,7 @@
 """
 
 # External dependencies:
+import inspect
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.path as mpltPath
@@ -1936,7 +1937,9 @@ class PlateGather:
             self.surfdim[i] = area #adim
         self.surfdim = self.surfdim * (4*np.pi*Project.planetaryModel.radius**2)/tri.area # dim
         
-    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',plot=False,verbose=False):
+          
+
+    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',plot=False,verbose=False):
         """
         Function computing and returning the cumulative, inverse
         cumulative and PDF representing the distribution of an
@@ -1977,7 +1980,7 @@ class PlateGather:
         else:
             data = self.surfdim.copy()
             bins, invcumul, cumul, pdf = distribution(data, binning=binning, nbins=nbins, step=step, small=small, plot=False, verbose=verbose)
-            
+
             # Plot the PDF
             if plot:
 
@@ -1997,7 +2000,7 @@ class PlateGather:
                     ax.set_yscale('log')
                 plt.show()
             
-            return bins, invcumul, cumul, pdf, pdfBird
+            return bins, invcumul, cumul, pdf
 
 
     def expand_plate2surface(self,arr,on_poly=False):

@@ -1,0 +1,9 @@
+# Ignore an entire folder containing data
+docs/sample/XDMF-H5/
+docs/sample/1-Tessellation/TTK_outputs/
+docs/sample/1-Tessellation/TTK_outputs/**
+docs/sample/2-Persistence-analysis/OPTIMIZED/
+docs/figs/
+docs/figs/**
+
+.DS_Store

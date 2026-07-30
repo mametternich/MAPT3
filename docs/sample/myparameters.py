@@ -14,11 +14,13 @@ path = '/'.join(str(os.path.realpath(__file__)).split('/')[0:-1])+'/'   # direct
 
 # Expected number of point at the surface
 # of the convection model (type: float):
-nop = 368120
+# nop = 368120
+nop = 100000 # A.J. Largely enough for this model
 
 # Radius of the convection model surface
 # (type: float):
-modelRadius = 2.1988971841
+modelRadius = 2.2 # A.J. if you adim the mesh as I did, you need to update this here.
+# modelRadius = 6356731.0      # Earth radius in meters
 
 # Planetary model (type: MAPT3.planetaryModels):
 from MAPT3.planetaryModels import Earth
@@ -28,13 +30,15 @@ planetaryModel = Earth
 # below the inversion of the velocity field
 # is not computed and the polygon is not
 # considered as a plate (type: int):
-polyminsize = 20
+polyminsize = 20 # A.J. From what I see of your horizontal resolution, you may want to lower this parameter 
 
 # --- Tessellation
 
 # Minimum persistence thresholds tested during
 # the tessellation (type: np.ndarray)
-pmin = np.array([1000, 2000])
+pmin = np.array([100,500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,18000,19000,20000,25000,30000,35000,40000,45000,50000])
+# pmin=np.array([1e-17,2e-17,4e-17,6e-17,8e-17,1e-16,2e-16,4e-16,6e-16,8e-16,1e-15])
+# pmin=np.array([1e-16])
 
 # --- Optimization
 
