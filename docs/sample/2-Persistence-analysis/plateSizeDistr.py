@@ -18,6 +18,7 @@ import re
 import glob
 
 # MAPT3 importation
+from MAPT3.compute import distribution
 from MAPT3.generics import intstringer
 from MAPT3.tessellation import PlateGather
 # import MAPT3.tessellation
@@ -173,11 +174,23 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
     if pg is None:
         return None
 
+    size_cutoff = 5e4 # km^2: minimum plate size to consider due to our resolution (~1° grid spacing > ~4 grid cells)
+    filtered_surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
+    if len(filtered_surfdim) == 0:
+        print(f'Skipping {model_name} frame {frame}: no plates remain above {size_cutoff} km^2.')
+        return None
+
     try:
-        dist_log = pg.get_distribution(
-            earthSizeDistriFile=path_to_sizedistrData, nbins=20, interval='log')
-        dist_raw = pg.get_distribution(
-            earthSizeDistriFile=path_to_sizedistrData, nbins=20, interval='raw')
+        dist_log = distribution(
+            filtered_surfdim,
+            nbins=20,
+            earthSizeDistriFile=path_to_sizedistrData,
+            interval='log')
+        dist_raw = distribution(
+            filtered_surfdim,
+            nbins=20,
+            earthSizeDistriFile=path_to_sizedistrData,
+            interval='raw')
     except Exception as exc:
         print(f'Skipping {model_name} frame {frame}: unable to compute distributions ({exc}).')
         return None
@@ -212,8 +225,8 @@ def format_frame_list(frames_to_format, width=5):
 # ==================================================
 
 path  = './OPTIMIZED/'
-# models = ['fDys20-sc','fDys30-sc','fDys50-sc','fDys20_eta20-sc','fDys30_eta20-sc','fDys50_eta20-sc']
-models = ['fDys50']
+models = ['fDys20-sc','fDys30-sc','fDys40-sc','fDys50-sc','fDys20_eta20-sc','fDys30_eta20-sc','fDys40_eta20-sc','fDys50_eta20-sc']
+# models = ['fDys50']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below
@@ -221,8 +234,8 @@ allframes = False
 plotSpread = False
 WSD_to_imposed_models = False
 plot_CCDF_PDF_together = False
-# frames = [720, 740, 760, 780, 800, 820, 840, 860, 880, 900]
-frames = [860]
+frames = [1057,1045,1017,1032,1046,1052,1016,1021]
+# frames = [860]
 
 # Some checks
 if not allframes and len(models)<len(frames): allframes = True  # plots multiple time steps for 1 model only
@@ -288,15 +301,15 @@ if plot_CCDF_PDF_together:
 # Color palette (converted from the provided Matlab-style matrix)
 cmap = [
     (0.1216, 0.4667, 0.7059),  # blue 1
-    (0.6824, 0.7804, 0.9098),  # light blue 2
+    # (0.6824, 0.7804, 0.9098),  # light blue 2
     (1.0000, 0.4980, 0.0549),  # orange 3
-    (1.0000, 0.7333, 0.4706),  # light orange 4
+    # (1.0000, 0.7333, 0.4706),  # light orange 4
     (0.1725, 0.6275, 0.1725),  # green 5
-    (0.5961, 0.8745, 0.5412),  # light green 6
+    # (0.5961, 0.8745, 0.5412),  # light green 6
     # (0.8392, 0.1529, 0.1569),  # red 7
-    (1.0000, 0.5961, 0.5882),  # light red 8
+    # (1.0000, 0.5961, 0.5882),  # light red 8
     (0.5804, 0.4039, 0.7412),  # purple 9
-    (0.7725, 0.6902, 0.8353),  # light purple 10
+    # (0.7725, 0.6902, 0.8353),  # light purple 10
     (0.5490, 0.3373, 0.2941),  # brown 11
     (0.7686, 0.6118, 0.5804),  # light brown 12
     (0.8902, 0.4667, 0.7608),  # pink 13

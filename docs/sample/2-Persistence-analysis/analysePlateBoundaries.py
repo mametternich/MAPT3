@@ -27,13 +27,13 @@ from MAPT3.tessellation import PlateGather
 
 path  = './OPTIMIZED/'
 drive = '/Volumes/MarsBook'
-models = ['fDys50-sc']
+models = ['Dys50-sc']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below
 allframes = False
 # frames = [720, 740, 760, 780, 800, 820, 840, 860, 880, 900]
-frames = [1020]
+frames = [1032]
 
 # AUTO-DETECT FRAMES IF REQUESTED
 frames_by_model = {}

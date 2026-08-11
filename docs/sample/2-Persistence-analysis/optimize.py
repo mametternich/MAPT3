@@ -33,7 +33,7 @@ pthreshold = Project.pmin # here, all the values used for the tessellation
 # models = ['fDys30-ysg-sc', 'fDys50-ysg-sc']
 # models = ['fDys20-ysg-sc', 'fDys20_eta20-ysg-sc']
 # models = ['Dys30-sc','Dys30_eta20-sc','Dys40_eta20-sc','Dys50-sc','Dys50_eta20-sc']
-models = ['fDys20','fDys50']
+models = ['fDys20_eta20-sc','fDys30_eta20-sc','fDys50_eta20-sc']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below

@@ -3,11 +3,13 @@ import re
 import shutil
 from collections import defaultdict
 
-delete = True
-assess = True
+delete = 0      # will delete the files in models
+assess = 1      # will assess all models in the data folders and print memory usage
 
 models = []
-models.append('fDys30_eta20')
+# models.append('fDys40-sc')
+# models.append('fDys40_eta20-sc')
+models.append('Dys50-sc')
 
 xdmf_path = os.path.join(os.path.dirname(__file__), 'XDMF-H5')
 ttk_root = os.path.join(os.path.dirname(__file__), '1-Tessellation/TTK_outputs')

@@ -5,5 +5,9 @@ docs/sample/1-Tessellation/TTK_outputs/**
 docs/sample/2-Persistence-analysis/OPTIMIZED/
 docs/figs/
 docs/figs/**
+docs/sample/2-Persistence-analysis/.temp*
+*.pyc
+*.pyo
+*.pyd
 
 .DS_Store
