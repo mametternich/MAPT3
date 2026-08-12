@@ -6,6 +6,8 @@ docs/sample/2-Persistence-analysis/OPTIMIZED/
 docs/figs/
 docs/figs/**
 docs/sample/2-Persistence-analysis/.temp*
+docs/sample/2-Persistence-analysis/__pycache__/*
+MAPT3/__pycache__/*
 *.pyc
 *.pyo
 *.pyd
