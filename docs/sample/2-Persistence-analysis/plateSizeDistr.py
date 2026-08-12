@@ -18,7 +18,6 @@ import re
 import glob
 
 # MAPT3 importation
-from MAPT3.compute import distribution
 from MAPT3.generics import intstringer
 from MAPT3.tessellation import PlateGather
 # import MAPT3.tessellation
@@ -137,8 +136,6 @@ def prepare_frame_data(path, model_name, frame):
     pg = PlateGather()
     pg.load_from_h5(path + file)
 
-    # print(f'Model {model_name} frame {frame}: lone {len(pg.lone)} late {len(pg.late)} surf {len(pg.surf)} peri {len(pg.peri)}')
-
     if pg.nop == 0 or len(pg.surf) == 0 or np.sum(pg.surf) == 0:
         print(f'Skipping {model_name} frame {frame}: no plates found.')
         return None
@@ -175,22 +172,20 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
         return None
 
     size_cutoff = 5e4 # km^2: minimum plate size to consider due to our resolution (~1° grid spacing > ~4 grid cells)
-    filtered_surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
-    if len(filtered_surfdim) == 0:
+    print(f'Number of plates before cutoff : {len(pg.surfdim)}')
+    pg.surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
+    print(f'Min/Max surfdim for {model_name} frame {frame}: {np.min(pg.surfdim):.2f} / {np.max(pg.surfdim):.2f} km^2')
+    print(f'Number of plates above {size_cutoff} km^2: {len(pg.surfdim)}')
+    pg.nop = len(pg.surfdim)
+    if pg.nop == 0:
         print(f'Skipping {model_name} frame {frame}: no plates remain above {size_cutoff} km^2.')
         return None
 
     try:
-        dist_log = distribution(
-            filtered_surfdim,
-            nbins=20,
-            earthSizeDistriFile=path_to_sizedistrData,
-            interval='log')
-        dist_raw = distribution(
-            filtered_surfdim,
-            nbins=20,
-            earthSizeDistriFile=path_to_sizedistrData,
-            interval='raw')
+        dist_log = pg.get_distribution(
+            earthSizeDistriFile=path_to_sizedistrData, nbins=20, binningEarth='log')
+        dist_raw = pg.get_distribution(
+            earthSizeDistriFile=path_to_sizedistrData, nbins=20, binningEarth='raw')
     except Exception as exc:
         print(f'Skipping {model_name} frame {frame}: unable to compute distributions ({exc}).')
         return None
@@ -222,14 +217,20 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
 def format_frame_list(frames_to_format, width=5):
     """Format frame numbers for filenames."""
     return '-'.join(f'{frame:0{width}d}' for frame in frames_to_format)
-# ==================================================
 
-path  = './OPTIMIZED/'
-models = ['fDys20-sc','fDys30-sc','fDys40-sc','fDys50-sc','fDys20_eta20-sc','fDys30_eta20-sc','fDys40_eta20-sc','fDys50_eta20-sc']
-# models = ['fDys50']
+# === USER INPUTS ===
+models = []
+models.append('fDys20-sc')
+models.append('fDys30-sc')
+models.append('fDys40-sc')
+models.append('fDys50-sc')
+models.append('fDys20_eta20-sc')
+models.append('fDys30_eta20-sc')
+models.append('fDys40_eta20-sc')
+models.append('fDys50_eta20-sc')
 
 # Set allframes to True to automatically detect all available frames,
-# or False to use the manually specified frames list below
+#   or False to use the manually specified frames list below
 allframes = False
 plotSpread = False
 WSD_to_imposed_models = False
@@ -237,66 +238,15 @@ plot_CCDF_PDF_together = False
 frames = [1057,1045,1017,1032,1046,1052,1016,1021]
 # frames = [860]
 
-# Some checks
-if not allframes and len(models)<len(frames): allframes = True  # plots multiple time steps for 1 model only
-if not allframes: plotSpread = False
-if plot_CCDF_PDF_together and (allframes or plotSpread):
-    raise ValueError('plot_CCDF_PDF_together can only be used when allframes is False and plotSpread is False.')
-if WSD_to_imposed_models and not allframes: print('WARNING: WSD_to_imposed_models is only meaningful when allframes is True. Ignoring it.')
-if WSD_to_imposed_models:
-    imposed_models = [m for m in models if not m.startswith('f')]
-    if len(imposed_models) == 0:
-        raise ValueError(
-            'WSD_to_imposed_models is True but no imposed models were found. ')
-    if len(models) % 2 != 0:
-        raise ValueError(
-            'WSD_to_imposed_models is True supposedly there are not as many self-consistent as imposed models. ')
-
-# AUTO-DETECT FRAMES IF REQUESTED
-frames_by_model = {}
-if allframes:
-    for model_name in models:
-        h5_pattern = os.path.join(path, f'{model_name}_*_optimized.h5')
-        h5_files = glob.glob(h5_pattern)
-        model_frames = []
-        for h5_file_path in h5_files:
-            match = re.search(rf'{model_name}_(\d+)_optimized\.h5', h5_file_path)
-            if match:
-                model_frames.append(int(match.group(1)))
-        model_frames = sorted(list(set(model_frames)))
-        frames_by_model[model_name] = model_frames
-        print(f'Auto-detected {len(model_frames)} frames for {model_name}: {model_frames}')
-
-# BUILD CALLED MODEL-FRAME PAIRS
-if allframes:
-    called_pairs = [(model_name, frame) for model_name in models for frame in frames_by_model.get(model_name, [])]
-else:
-    called_pairs = list(zip(models, frames))
-
+# Some paths
 path_to_sizedistrData = '/Users/marlametternich/Documents/Code/MAPT3/MAPT3/Bird_2003_Table1_SurfaceSteradian.npy'
-
-n_called = len(called_pairs)
-called_models = np.array([m for m, _ in called_pairs], dtype=object)
-called_frames = np.array([f for _, f in called_pairs], dtype=np.int32)
-valid_mask = np.zeros(n_called, dtype=bool)
-frame_data = {}
-for idx, (model_name, frame) in enumerate(called_pairs):
-    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData)
-    if frame_info is not None:
-        frame_data[(model_name, frame)] = frame_info
-        valid_mask[idx] = True
-
-if not np.any(valid_mask):
-    print('WARNING: No valid frames with usable plates were found. Nothing to plot.')
-
+path  = './OPTIMIZED/'
 if allframes:
     output_dir = os.path.expanduser('~/Documents/Earth/Figures/PlateSizeDistr/OneModel/')
 else:
     output_dir = os.path.expanduser('~/Documents/Earth/Figures/PlateSizeDistr/')
-
 if plot_CCDF_PDF_together:
     combined_output_dir = '/Users/marlametternich/Documents/Earth/Figures/PlateSizeDistr/CCDF+PDF/'
-    os.makedirs(combined_output_dir, exist_ok=True)
 
 # Color palette (converted from the provided Matlab-style matrix)
 cmap = [
@@ -323,13 +273,64 @@ cmap = [
 ]
 imola_cmap = imola_map.reversed()
 
-# Build plotting groups from index masks.
+# === CHECKS & PREP ===
+if not allframes and len(models)<len(frames): allframes = True  # plots multiple time steps for 1 model only
+if not allframes: plotSpread = False
+if plot_CCDF_PDF_together and (allframes or plotSpread):
+    raise ValueError('plot_CCDF_PDF_together can only be used when allframes is False and plotSpread is False.')
+if WSD_to_imposed_models and not allframes: print('WARNING: WSD_to_imposed_models is only meaningful when allframes is True. Ignoring it.')
+if WSD_to_imposed_models:
+    imposed_models = [m for m in models if not m.startswith('f')]
+    if len(imposed_models) == 0:
+        raise ValueError(
+            'WSD_to_imposed_models is True but no imposed models were found. ')
+    if len(models) % 2 != 0:
+        raise ValueError(
+            'WSD_to_imposed_models is True supposedly there are not as many self-consistent as imposed models. ')
+
+# Auto-detect frames if requested
+frames_by_model = {}
+if allframes:
+    for model_name in models:
+        h5_pattern = os.path.join(path, f'{model_name}_*_optimized.h5')
+        h5_files = glob.glob(h5_pattern)
+        model_frames = []
+        for h5_file_path in h5_files:
+            match = re.search(rf'{model_name}_(\d+)_optimized\.h5', h5_file_path)
+            if match:
+                model_frames.append(int(match.group(1)))
+        model_frames = sorted(list(set(model_frames)))
+        frames_by_model[model_name] = model_frames
+        print(f'Auto-detected {len(model_frames)} frames for {model_name}: {model_frames}')
+
+# Build called model-frame pairs
+if allframes:
+    called_pairs = [(model_name, frame) for model_name in models for frame in frames_by_model.get(model_name, [])]
+else:
+    called_pairs = list(zip(models, frames))
+
+n_called = len(called_pairs)
+called_models = np.array([m for m, _ in called_pairs], dtype=object)
+called_frames = np.array([f for _, f in called_pairs], dtype=np.int32)
+valid_mask = np.zeros(n_called, dtype=bool)
+frame_data = {}
+for idx, (model_name, frame) in enumerate(called_pairs):
+    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData)
+    if frame_info is not None:
+        frame_data[(model_name, frame)] = frame_info
+        valid_mask[idx] = True
+
+if not np.any(valid_mask):
+    print('WARNING: No valid frames with usable plates were found. Nothing to plot.')
+
+# === Wasserstein distance + combined CCDF/PDF (if True) ===
+# Build plotting groups from index masks
 if allframes:
     group_defs = [(model_name, np.where(called_models == model_name)[0]) for model_name in models]
 else:
     group_defs = [('combined', np.arange(n_called, dtype=np.int32))]
 
-# Precompute W per called pair, leaving NaN for rejected frames.
+# Precompute W per called pair, leaving NaN for rejected frames
 W_by_pair = np.full(n_called, np.nan, dtype=float)
 valid_indices = np.where(valid_mask)[0]
 stored_distribution_by_frame = {}
@@ -362,7 +363,7 @@ for idx in valid_indices:
     else:
         x_model = np.log10(bins)
         x_Bird = np.log10(cumul_bins_Bird)
-        ccdf_model = cumul / cumul[0]   # normalise so it's dominated by shape, not scale (THIS USED TO NOT BE DONE, bug?)
+        ccdf_model = cumul / cumul[0]   # normalise so it's dominated by shape, not scale
         ccdf_earth = cumul_Bird / cumul_Bird[0]
         F_earth_on_model = np.interp(x_model, x_Bird, ccdf_earth)
         W_by_pair[idx] = np.sum(np.abs(F_earth_on_model - ccdf_model) * np.diff(x_model, prepend=x_model[0]))
@@ -436,7 +437,6 @@ for group_name, group_indices in group_defs:
             Line2D([0], [0], color='k', linestyle='--', linewidth=2, label='PDF'),
         ]
         ax1.legend(model_handles + style_handles, model_labels + ['CCDF', 'PDF'], loc='best')
-        
 
         outpath = os.path.join(combined_output_dir, group_name + '_' + '-'.join(models) + '_CCDF+PDF.png')
         fig1.savefig(outpath, dpi=300, transparent=True, bbox_inches='tight')
@@ -489,7 +489,7 @@ for group_name, group_indices in group_defs:
     fig1.savefig(outpath, dpi=300, transparent=True, bbox_inches='tight')
     print(f"Saved PDF figure to {outpath}")
 
-    # === Inverse cumulative plot (iCDF) ===
+    # === Complementary cumulative plot (CCDF) ===
     fig2 = plt.figure(figsize=(8, 6))
     ax2 = fig2.add_subplot(111)
     ax2.set_xlabel('Plate area (km'+r'$^2$'+')', fontweight='bold', fontname='Georgia', fontsize=14)

@@ -2102,7 +2102,7 @@ class PlateGather:
             self.surfdim[i] = area #adim
         self.surfdim = self.surfdim * (4*np.pi*Project.planetaryModel.radius**2)/tri.area # dim
         
-    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',interval='log',plot=False,verbose=False):
+    def get_distribution(self,binning='log',nbins=10,step=5,small='auto',earthSizeDistriFile='./Bird_2003_Table1_SurfaceSteradian.npy',binningEarth='log',plot=False,verbose=False):
         """
         Function computing and returning the cumulative, inverse
         cumulative and PDF representing the distribution of an
@@ -2142,7 +2142,7 @@ class PlateGather:
             raise ValueError('Missing dimensionalized plate areas. Use first the internal function compute_dim_perimeter_area()')
         else:
             data = self.surfdim.copy()
-            bins, cumul, pdf, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = distribution(data, binning=binning, nbins=nbins, step=step, small=small, earthSizeDistriFile=earthSizeDistriFile,interval=interval,plot=False, verbose=verbose)
+            bins, cumul, pdf, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = distribution(data, binning=binning, nbins=nbins, step=step, small=small, earthSizeDistriFile=earthSizeDistriFile,binningEarth=binningEarth,plot=False, verbose=verbose)
             
             # Plot the PDF
             if plot:
