@@ -165,33 +165,37 @@ def has_valid_distribution(distribution_values):
     mask = np.isfinite(values) & (values > 0)
     return np.any(mask)
 
-def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=None):
+def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=None, size_cutoff=None):
     """Load a frame and precompute plot-ready distributions when available."""
     pg = prepare_frame_data(path, model_name, frame)
     if pg is None:
         return None
 
-    size_cutoff = 5e4 # km^2: minimum plate size to consider due to our resolution (~1° grid spacing > ~4 grid cells)
-    print(f'Number of plates before cutoff : {len(pg.surfdim)}')
-    pg.surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
-    print(f'Min/Max surfdim for {model_name} frame {frame}: {np.min(pg.surfdim):.2f} / {np.max(pg.surfdim):.2f} km^2')
-    print(f'Number of plates above {size_cutoff} km^2: {len(pg.surfdim)}')
-    pg.nop = len(pg.surfdim)
-    if pg.nop == 0:
-        print(f'Skipping {model_name} frame {frame}: no plates remain above {size_cutoff} km^2.')
-        return None
+    # Load the Bird 2003 reference data once here so it can be filtered the same way as the model data.
+    earth_size_distribution = np.load(path_to_sizedistrData) * 6371**2
+    if size_cutoff is not None:
+        pg.surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
+        pg.nop = len(pg.surfdim)
+        if pg.nop == 0:
+            print(f'Skipping {model_name} frame {frame}: no plates remain above {size_cutoff} km^2.')
+            return None
+        earth_size_distribution = earth_size_distribution[earth_size_distribution >= size_cutoff]
+        if earth_size_distribution.size == 0:
+            raise ValueError(
+                f'No Bird 2003 reference plates remain above {size_cutoff} km^2.'
+            )
 
     try:
         dist_log = pg.get_distribution(
-            earthSizeDistriFile=path_to_sizedistrData, nbins=20, binningEarth='log')
+            earthSizeDistriFile=earth_size_distribution, nbins=20, binningEarth='log')
         dist_raw = pg.get_distribution(
-            earthSizeDistriFile=path_to_sizedistrData, nbins=20, binningEarth='raw')
+            earthSizeDistriFile=earth_size_distribution, nbins=20, binningEarth='raw')
     except Exception as exc:
         print(f'Skipping {model_name} frame {frame}: unable to compute distributions ({exc}).')
         return None
 
     bins_log, cumul_log, pdf_log, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = dist_log
-    bins_raw, cumul_raw, pdf_raw, _, _, _, _ = dist_raw
+    bins_raw, cumul_raw,_,_,_,_,_ = dist_raw
 
     if not has_valid_distribution(pdf_log):
         print(f'Skipping {model_name} frame {frame}: no valid PDF values available.')
@@ -235,6 +239,7 @@ allframes = False
 plotSpread = False
 WSD_to_imposed_models = False
 plot_CCDF_PDF_together = False
+size_cutoff = 5e4       # km^2: minimum plate size to consider due to our resolution (~1° grid spacing > ~4 grid cells)
 frames = [1057,1045,1017,1032,1046,1052,1016,1021]
 # frames = [860]
 
@@ -315,7 +320,7 @@ called_frames = np.array([f for _, f in called_pairs], dtype=np.int32)
 valid_mask = np.zeros(n_called, dtype=bool)
 frame_data = {}
 for idx, (model_name, frame) in enumerate(called_pairs):
-    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData)
+    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData, size_cutoff=size_cutoff)
     if frame_info is not None:
         frame_data[(model_name, frame)] = frame_info
         valid_mask[idx] = True

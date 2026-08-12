@@ -171,15 +171,18 @@ def distribution(data,binning='log',nbins=10,step=5,small='auto',earthSizeDistri
         norm += dN
     pdf /= norm # normalize the pdf to have: \int_-inf^+inf pdf(s) ds = 1
 
-# --- Bird 2003
+    # --- Bird 2003
     # binningEarth = 'log'  # choose binningEarth 'raw', 'log' or 'normal'
     #     The argument binningEarth is a string that command the different type of possible
     # plate size binningEarths:
     #         - binningEarth = 'raw'    -> the list of plate size is just np.unique(self.surfdim)
     #         - binningEarth = 'normal' -> generated in the normal space and cover the range of plate size
     #         - binningEarth = 'log'    -> [Default] generated in the log space and cover the range of plate size
-    earthPlateSurf = np.load(earthSizeDistriFile)
-    earthPlateSurf = earthPlateSurf * 6371**2  # conversion to km^2
+    if isinstance(earthSizeDistriFile, np.ndarray):
+        earthPlateSurf = np.asarray(earthSizeDistriFile, dtype=float).copy()
+    else:
+        earthPlateSurf = np.load(earthSizeDistriFile)
+        earthPlateSurf = earthPlateSurf * 6371**2  # conversion to km^2
 
     if binningEarth == 'normal':
         bins_Bird = np.linspace(100, int(np.amax(earthPlateSurf)+10), 1000)
