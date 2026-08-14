@@ -14,6 +14,7 @@ import os
 from matplotlib.lines import Line2D
 from scipy.stats import wasserstein_distance
 from scipy.io import savemat
+from scipy.integrate import trapezoid
 import re
 import glob
 
@@ -186,16 +187,16 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
             )
 
     try:
-        dist_log = pg.get_distribution(
+        dist_log = pg.get_distribution(binning='log',       # use for distribution plots and WSD calculation
             earthSizeDistriFile=earth_size_distribution, nbins=20, binningEarth='log')
-        dist_raw = pg.get_distribution(
+        dist_raw = pg.get_distribution(                     # use mostly for raw Earth ref. data
             earthSizeDistriFile=earth_size_distribution, nbins=20, binningEarth='raw')
     except Exception as exc:
         print(f'Skipping {model_name} frame {frame}: unable to compute distributions ({exc}).')
         return None
 
     bins_log, cumul_log, pdf_log, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = dist_log
-    bins_raw, cumul_raw,_,_,_,_,_ = dist_raw
+    bins_raw, cumul_raw,_,bins_Bird_raw,_,_,cumul_Bird_raw = dist_raw
 
     if not has_valid_distribution(pdf_log):
         print(f'Skipping {model_name} frame {frame}: no valid PDF values available.')
@@ -221,6 +222,18 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
 def format_frame_list(frames_to_format, width=5):
     """Format frame numbers for filenames."""
     return '-'.join(f'{frame:0{width}d}' for frame in frames_to_format)
+
+def calc_1d_wasserstein(x_ref, ccdf_ref, x_target, ccdf_target):
+    """Calculates 1D Wasserstein distance between two CCDFs interpolated onto a shared grid."""
+    # 1. Normalize CDFs to [0, 1]
+    cdf1 = ccdf_target / ccdf_target[0]
+    cdf2 = ccdf_ref / ccdf_ref[0]
+    # 2. Interpolate reference CDF onto target grid
+    cdf2_interp = np.interp(x_target, x_ref, cdf2)
+    # 3. Integrate absolute difference using trapezoidal rule
+    # Note: Use np.trapz for NumPy < 2.0 or np.trapezoid for NumPy >= 2.0
+    abs_diff = np.abs(cdf2_interp - cdf1)
+    return trapezoid(abs_diff, x_target)
 
 # === USER INPUTS ===
 models = []
@@ -291,7 +304,7 @@ if WSD_to_imposed_models:
             'WSD_to_imposed_models is True but no imposed models were found. ')
     if len(models) % 2 != 0:
         raise ValueError(
-            'WSD_to_imposed_models is True supposedly there are not as many self-consistent as imposed models. ')
+            'WSD_to_imposed_models is True but there are not as many self-consistent as imposed models. ')
 
 # Auto-detect frames if requested
 frames_by_model = {}
@@ -342,8 +355,7 @@ stored_distribution_by_frame = {}
 for idx in valid_indices:
     model_name = called_models[idx]
     frame = int(called_frames[idx])
-    # print('Processing WSD for model ', model_name, ' frame ', frame)
-    bins, cumul, _, _, _, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['raw']
+    bins, cumul, _, _, _, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['log']
 
     if WSD_to_imposed_models:
         if model_name.startswith('f'):
@@ -351,28 +363,25 @@ for idx in valid_indices:
             print(f'Storing self-consistent distribution for frame {frame} from model {model_name}')
             continue
 
-        if frame not in stored_distribution_by_frame:
+        if frame not in stored_distribution_by_frame:  # Is this actually necessary?
             print(f'Skipping WSD for {model_name} frame {frame}: no matching self-consistent distribution was stored.')
             continue
 
-        model_bins, model_cumul, model_idx = stored_distribution_by_frame[frame]
+        model_bins, model_cumul, model_idx = stored_distribution_by_frame.pop(frame)
         x_model = np.log10(model_bins)
         x_imposed = np.log10(bins)
-        ccdf_model = model_cumul / model_cumul[0]   # normalise so it's dominated by shape, not scale
-        ccdf_imposed = cumul / cumul[0]
-        imposed_on_model = np.interp(x_model, x_imposed, ccdf_imposed)
-        W_value = np.sum(np.abs(imposed_on_model - ccdf_model) * np.diff(x_model, prepend=x_model[0]))
+        W_value = calc_1d_wasserstein(x_ref=x_imposed, ccdf_ref=cumul, 
+                                                     x_target=x_model, ccdf_target=model_cumul)
         W_by_pair[model_idx] = W_value
         W_by_pair[idx] = np.nan
-        print('Wasserstein distance for model ', called_models[model_idx], ' frame ', frame, ' against imposed reference is ', W_by_pair[model_idx])
+        print(f'Wasserstein distance for model {called_models[model_idx]} frame {frame} against imposed reference is {W_value:.3f}')
     else:
         x_model = np.log10(bins)
         x_Bird = np.log10(cumul_bins_Bird)
-        ccdf_model = cumul / cumul[0]   # normalise so it's dominated by shape, not scale
-        ccdf_earth = cumul_Bird / cumul_Bird[0]
-        F_earth_on_model = np.interp(x_model, x_Bird, ccdf_earth)
-        W_by_pair[idx] = np.sum(np.abs(F_earth_on_model - ccdf_model) * np.diff(x_model, prepend=x_model[0]))
-        print('Wasserstein distance for model ', model_name, ' frame ', frame, ' is ', W_by_pair[idx])
+        W_value = calc_1d_wasserstein(x_ref=x_Bird, ccdf_ref=cumul_Bird, 
+                                             x_target=x_model, ccdf_target=cumul)
+        W_by_pair[idx] = W_value
+        print(f'Wasserstein distance for model {model_name} frame {frame} is {W_value:.3f}')
 
 os.makedirs(output_dir, exist_ok=True)
 for group_name, group_indices in group_defs:
@@ -408,12 +417,11 @@ for group_name, group_indices in group_defs:
         for i, idx in enumerate(group_valid_indices):
             model_name = called_models[idx]
             frame = int(called_frames[idx])
-            bins_log, cumul_log, pdf_log, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['log']
-            bins_raw, cumul_raw, pdf_raw, _, _, _, _ = frame_data[(model_name, frame)]['raw']
+            bins, cumul, pdf_log, bins_Bird, pdfBird, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['log']
 
-            mask_cumul = ~np.isnan(cumul_raw) & (cumul_raw > 0)
+            mask_cumul = ~np.isnan(cumul) & (cumul > 0)
             mask_pdf = ~np.isnan(pdf_log) & (pdf_log > 0)
-            midpoints = (bins_log[:-1] + bins_log[1:]) / 2
+            midpoints = (bins[:-1] + bins[1:]) / 2
             bins_Bird_mid = (bins_Bird[:-1] + bins_Bird[1:]) / 2.0
 
             color = cmap[i % len(cmap)]
@@ -432,7 +440,7 @@ for group_name, group_indices in group_defs:
                     ax1_pdf.plot(bins_Bird_mid[mask_bird_pdf], pdfBird[mask_bird_pdf], linestyle='--', linewidth=2, c='k')
                 bird_plotted_pdf = True
 
-            line_ccdf = ax1.plot(bins_raw[mask_cumul], cumul_raw[mask_cumul], linestyle='-', linewidth=1.5, color=color, label=model_name)
+            line_ccdf = ax1.plot(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5, color=color, label=model_name)
             ax1_pdf.plot(midpoints[mask_pdf], pdf_log[mask_pdf], linestyle='--', linewidth=1.5, color=color)
             model_handles.extend(line_ccdf)
             model_labels.extend([model_name])
@@ -506,7 +514,7 @@ for group_name, group_indices in group_defs:
     for i, idx in enumerate(group_valid_indices):
         model_name = called_models[idx]
         frame = int(called_frames[idx])
-        bins, cumul, _, _, _, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['raw']
+        bins, cumul, _, _, _, cumul_bins_Bird, cumul_Bird = frame_data[(model_name, frame)]['log']
 
         if allframes and plotSpread:
             x_models_all.append(np.log10(bins))
