@@ -21,8 +21,8 @@ Project.set('../myparameters.py')
 pthreshold = Project.pmin # here, all the values used for the tessellation
 
 # Models to plot
-models = ['fDys30-fromstart']
-frames = [1027]
+models = ['fDys30-sc']
+frames = [1045]
 
 for model,frame in zip(models,frames):
     print(f'Optimizing tessellation for model {model} at frame {frame}')
@@ -37,7 +37,7 @@ for model,frame in zip(models,frames):
         return path+'/'+file
 
     # Output file name
-    ofilename  = myfile
+    myfile  = myfile
     savefigpath= '../../figs/'+model+'/'
     if not os.path.exists(savefigpath):
         os.makedirs(savefigpath)
@@ -45,11 +45,10 @@ for model,frame in zip(models,frames):
     # Test rigidity for the optimized tessellation (optional, added by Marla)
     # Load the optimized tessellation
     pg_optimized = PlateGather()
-    pg_optimized.load_from_h5(f'./OPTIMIZED/{ofilename}_optimized.h5')
+    pg_optimized.load_from_h5(f'./OPTIMIZED/{myfile}_optimized.h5')
     
     # Initialize rigidity array for all points
     real_rigidity = np.zeros(len(pg_optimized.x), dtype=int)  # 0 = non-rigid, 1 = rigid (or make it bool?)
-
     
     # Unique plateIDs from optimized.plateID
     unique_plateIDs = np.unique(pg_optimized.plateID)
@@ -58,8 +57,7 @@ for model,frame in zip(models,frames):
     for pID in unique_plateIDs:
         # Compute rotation for this plate
         # automatic calculation of r based on nr points in the plate
-        # ...
-        surf  = np.count_nonzero(pg_optimized.plateID == pID)
+        surf = np.count_nonzero(pg_optimized.plateID == pID)
         r = resampling_param(surf)
         wx, wy, wz = pg_optimized.get_rotation(pID, r=r, plot=False)
         P1 = pg_optimized.P11
@@ -114,7 +112,7 @@ for model,frame in zip(models,frames):
     
     plt.tight_layout()
     # Save the figure
-    fig_filename = f'{savefigpath}{ofilename}_rigidity_map.png'
+    fig_filename = f'{savefigpath}{myfile}_rigidity_map.png'
     fig.savefig(fig_filename, dpi=200, bbox_inches='tight')
     print(f'  Rigidity map saved to: {fig_filename}')
     plt.show()

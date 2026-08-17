@@ -9,7 +9,7 @@ assess = 1      # will assess all models in the data folders and print memory us
 models = []
 # models.append('fDys40-sc')
 # models.append('fDys40_eta20-sc')
-models.append('Dys50-sc')
+models.append('fDys30-sc')
 
 xdmf_path = os.path.join(os.path.dirname(__file__), 'XDMF-H5')
 ttk_root = os.path.join(os.path.dirname(__file__), '1-Tessellation/TTK_outputs')
@@ -184,16 +184,16 @@ if assess:
         print(f"  {directory_name} ({len(extra_models)} models): {summary}")
 
     # Compute and print total sizes for the three data folders
+    print()
+    print("Calculating data size summary:")
+
     xdmf_total_bytes = get_dir_size_bytes(xdmf_path)
     opti_total_bytes = get_dir_size_bytes(opti_path)
     ttk_total_bytes = 0
     for ttk_dir in get_ttk_dirs(ttk_root):
         ttk_total_bytes += get_dir_size_bytes(ttk_dir)
-
     combined_bytes = xdmf_total_bytes + ttk_total_bytes + opti_total_bytes
 
-    print()
-    print("Data size summary:")
     print(f"  XDMF-H5:     {format_size_gb(xdmf_total_bytes)} ({format_size_mb(xdmf_total_bytes)})")
     print(f"  TTK_outputs: {format_size_gb(ttk_total_bytes)} ({format_size_mb(ttk_total_bytes)})")
     print(f"  OPTIMIZED:   {format_size_gb(opti_total_bytes)} ({format_size_mb(opti_total_bytes)})")

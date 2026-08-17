@@ -22,8 +22,9 @@ import glob
 from MAPT3.generics import intstringer
 from MAPT3.tessellation import PlateGather
 # import MAPT3.tessellation
-from MAPT3.rigidity import rigid
+from MAPT3.rigidity import rigid as rigid_rigidity  # Use alias to avoid conflict
 from MAPT3.project import Project
+from MAPT3.optimize import resampling_param
 
 # Scientific colour map importation
 import sys
@@ -166,11 +167,45 @@ def has_valid_distribution(distribution_values):
     mask = np.isfinite(values) & (values > 0)
     return np.any(mask)
 
-def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=None, size_cutoff=None):
+def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=None, filtering=False, size_cutoff=None):
     """Load a frame and precompute plot-ready distributions when available."""
     pg = prepare_frame_data(path, model_name, frame)
     if pg is None:
         return None
+
+    non_rigid_area = 0.0
+    if filtering:
+        # Loop through each plate, test rigidity and plate area
+        unique_plateIDs = np.unique(pg.plateID)
+        rigid_plate_mask = np.zeros(pg.nop, dtype=bool)
+        for pID in unique_plateIDs:
+            surf = np.count_nonzero(pg.plateID == pID)
+            r = resampling_param(surf)
+            wx, wy, wz = pg.get_rotation(pID, r=r, plot=False)
+            P1 = pg.P11
+            P2 = pg.P12
+            is_rigid = rigid_rigidity(pg, pID, wx, wy, wz, P1, P2)
+            rigid_plate_mask[pID] = is_rigid
+
+            if not is_rigid:
+                plate_area = float(pg.surfdim[pID])
+                non_rigid_area += plate_area
+
+            # print(f'  Plate {pID}: {"Rigid" if is_rigid else "Non-rigid"}')
+
+        valid_plate_ids = np.where(rigid_plate_mask)[0]
+        if valid_plate_ids.size == 0:
+            print(f'Skipping {model_name} frame {frame}: all plates are non-rigid after filtering.')
+            return None
+
+        pg.surfdim = pg.surfdim[valid_plate_ids]
+        pg.peridim = pg.peridim[valid_plate_ids]
+        pg.surf = pg.surf[valid_plate_ids]
+        pg.peri = pg.peri[valid_plate_ids]
+        pg.nop = len(valid_plate_ids)
+
+        if hasattr(pg, 'plateID'):
+            pg.plateID = pg.plateID[np.isin(pg.plateID, valid_plate_ids)]
 
     # Load the Bird 2003 reference data once here so it can be filtered the same way as the model data.
     earth_size_distribution = np.load(path_to_sizedistrData) * 6371**2
@@ -217,6 +252,7 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
         'pg': pg,
         'log': dist_log,
         'raw': dist_raw,
+        'non_rigid_area': non_rigid_area,
     }
 
 def format_frame_list(frames_to_format, width=5):
@@ -252,7 +288,8 @@ allframes = False
 plotSpread = False
 WSD_to_imposed_models = False
 plot_CCDF_PDF_together = False
-size_cutoff = 5e4       # km^2: minimum plate size to consider due to our resolution (~1° grid spacing > ~4 grid cells)
+filtering = True  # filter out non-rigid plates
+size_cutoff = 48400    # km^2: minimum plate size to consider (220x220km, as per Janin et al. 2025)
 frames = [1057,1045,1017,1032,1046,1052,1016,1021]
 # frames = [860]
 
@@ -333,7 +370,8 @@ called_frames = np.array([f for _, f in called_pairs], dtype=np.int32)
 valid_mask = np.zeros(n_called, dtype=bool)
 frame_data = {}
 for idx, (model_name, frame) in enumerate(called_pairs):
-    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData, size_cutoff=size_cutoff)
+    frame_info = prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData, 
+                                             filtering=filtering, size_cutoff=size_cutoff)
     if frame_info is not None:
         frame_data[(model_name, frame)] = frame_info
         valid_mask[idx] = True
@@ -657,4 +695,18 @@ if allframes:
         print(f"Saved total-plates-vs-frame figure to {outpath3}")
     else:
         print('No valid total-plate-count data available. Fig3 was not saved.')
+
+print('\n=== Non-rigid plate areas ===')        # STILL TO DO: AVERAGE WHEN ALLFRAMES=True
+for model_name in models:
+    for frame in sorted({frame for model, frame in frame_data.keys() if model == model_name}):
+        if (model_name, frame) not in frame_data:
+            continue
+        pg = frame_data[(model_name, frame)]['pg']
+        total_surface_area = float(np.sum(pg.surfdim))
+        non_rigid_area = float(frame_data[(model_name, frame)]['non_rigid_area'])
+        ratio_pct = (non_rigid_area / total_surface_area * 100.0) if total_surface_area > 0 else 0.0
+        print(
+            f'{model_name} frame {frame}: non-rigid area = {non_rigid_area:.3e} km^2; '
+            f'ratio = {ratio_pct:.2f}% of total area ({total_surface_area:.3e} km^2)'
+        )
         
