@@ -174,11 +174,14 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
         return None
 
     non_rigid_area = 0.0
+    total_area = float(np.sum(pg.surfdim))  # before filtering out surface area! for ratios later
     if filtering:
         # Loop through each plate, test rigidity and plate area
         unique_plateIDs = np.unique(pg.plateID)
         rigid_plate_mask = np.zeros(pg.nop, dtype=bool)
         for pID in unique_plateIDs:
+            plate_area = float(pg.surfdim[pID])
+
             surf = np.count_nonzero(pg.plateID == pID)
             r = resampling_param(surf)
             wx, wy, wz = pg.get_rotation(pID, r=r, plot=False)
@@ -188,16 +191,18 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
             rigid_plate_mask[pID] = is_rigid
 
             if not is_rigid:
-                plate_area = float(pg.surfdim[pID])
                 non_rigid_area += plate_area
 
-            # print(f'  Plate {pID}: {"Rigid" if is_rigid else "Non-rigid"}')
+            if size_cutoff is not None and plate_area < size_cutoff:
+                rigid_plate_mask[pID] = False
+                non_rigid_area += plate_area
 
         valid_plate_ids = np.where(rigid_plate_mask)[0]
         if valid_plate_ids.size == 0:
             print(f'Skipping {model_name} frame {frame}: all plates are non-rigid after filtering.')
             return None
-
+        
+        # Update PlateGather object to keep only rigid plates
         pg.surfdim = pg.surfdim[valid_plate_ids]
         pg.peridim = pg.peridim[valid_plate_ids]
         pg.surf = pg.surf[valid_plate_ids]
@@ -210,11 +215,9 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
     # Load the Bird 2003 reference data once here so it can be filtered the same way as the model data.
     earth_size_distribution = np.load(path_to_sizedistrData) * 6371**2
     if size_cutoff is not None:
-        pg.surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
-        pg.nop = len(pg.surfdim)
-        if pg.nop == 0:
-            print(f'Skipping {model_name} frame {frame}: no plates remain above {size_cutoff} km^2.')
-            return None
+        # Filter the model data based on the size cutoff
+        # pg.surfdim = pg.surfdim[pg.surfdim >= size_cutoff]
+        # pg.nop = len(pg.surfdim)
         earth_size_distribution = earth_size_distribution[earth_size_distribution >= size_cutoff]
         if earth_size_distribution.size == 0:
             raise ValueError(
@@ -253,6 +256,7 @@ def prepare_frame_distributions(path, model_name, frame, path_to_sizedistrData=N
         'log': dist_log,
         'raw': dist_raw,
         'non_rigid_area': non_rigid_area,
+        'total_area': total_area
     }
 
 def format_frame_list(frames_to_format, width=5):
@@ -273,25 +277,46 @@ def calc_1d_wasserstein(x_ref, ccdf_ref, x_target, ccdf_target):
 
 # === USER INPUTS ===
 models = []
-models.append('fDys20-sc')
-models.append('fDys30-sc')
-models.append('fDys40-sc')
-models.append('fDys50-sc')
-models.append('fDys20_eta20-sc')
-models.append('fDys30_eta20-sc')
+# models.append('fDys30-T0init1600')
+
+models.append('fDys20-sc') # 38% non-rigid
+models.append('fDys30-sc') # 30% non-rigid
+models.append('fDys40-sc') # 1% non-rigid
+models.append('fDys50-sc') # 0% non-rigid (stagnant lid)
+models.append('fDys20_eta20-sc') # 33% non-rigid 
+models.append('fDys30_eta20-sc') # 37% non-rigid
 models.append('fDys40_eta20-sc')
 models.append('fDys50_eta20-sc')
 
-# Set allframes to True to automatically detect all available frames,
-#   or False to use the manually specified frames list below
-allframes = False
-plotSpread = False
-WSD_to_imposed_models = False
-plot_CCDF_PDF_together = False
-filtering = True  # filter out non-rigid plates
+# models.append('fDys20-ysg-sc')
+# models.append('fDys30-ysg-sc') # 27% non-rigid
+# models.append('fDys40-ysg-sc')
+# models.append('fDys50-ysg-sc')
+# models.append('fDys20_eta20-ysg-sc')
+# models.append('fDys30_eta20-ysg-sc')
+# models.append('fDys40_eta20-ysg-sc')
+# models.append('fDys50_eta20-ysg-sc')
+
+# models.append('fDys30_eta20-sc')
+
+allframes = False # True = automatically detect all available frames, False to use the manually specified frames list below
+WSD_to_imposed_models = False # requires inputting alternating self-consistent and imposed models in the 'models' list above
+filtering = True       # filter out non-rigid plates
 size_cutoff = 48400    # km^2: minimum plate size to consider (220x220km, as per Janin et al. 2025)
-frames = [1057,1045,1017,1032,1046,1052,1016,1021]
-# frames = [860]
+plot_CCDF_PDF_together = False
+plot_theoCurve = True  # include theoretical curve of Alexandre Janin
+plotSpread = False # only if allframes = True
+plot_step = True  # use step plots for CCDF/PDF instead of line plots
+frames = [1057,1045,1017,1032,1046,1052,1016,1021] #for eta21-eta20-sc mods
+# frames = [1071,1045,1034,1032,1096,1053,1020,1021] #for ysg-sc mods (eta21/eta20)
+# frames = [1032, 1045, 1045, 1052]
+
+# Plotting-related
+# pdf
+slim0 = 45000
+slim1 = 2.5e8
+ylim0 = 5e-12
+ylim1 = 2e-5
 
 # Some paths
 path_to_sizedistrData = '/Users/marlametternich/Documents/Code/MAPT3/MAPT3/Bird_2003_Table1_SurfaceSteradian.npy'
@@ -311,14 +336,14 @@ cmap = [
     # (1.0000, 0.7333, 0.4706),  # light orange 4
     (0.1725, 0.6275, 0.1725),  # green 5
     # (0.5961, 0.8745, 0.5412),  # light green 6
-    # (0.8392, 0.1529, 0.1569),  # red 7
+    (0.8392, 0.1529, 0.1569),  # red 7
     # (1.0000, 0.5961, 0.5882),  # light red 8
     (0.5804, 0.4039, 0.7412),  # purple 9
     # (0.7725, 0.6902, 0.8353),  # light purple 10
     (0.5490, 0.3373, 0.2941),  # brown 11
-    (0.7686, 0.6118, 0.5804),  # light brown 12
+    # (0.7686, 0.6118, 0.5804),  # light brown 12
     (0.8902, 0.4667, 0.7608),  # pink 13
-    (0.9686, 0.7137, 0.8235),  # light pink 14
+    # (0.9686, 0.7137, 0.8235),  # light pink 14
     (0.4980, 0.4980, 0.4980),  # gray 15
     (0.7804, 0.7804, 0.7804),  # light gray 16
     (0.7373, 0.7412, 0.1333),  # yellow 17
@@ -408,6 +433,10 @@ for idx in valid_indices:
         model_bins, model_cumul, model_idx = stored_distribution_by_frame.pop(frame)
         x_model = np.log10(model_bins)
         x_imposed = np.log10(bins)
+        # ccdf_model = model_cumul / model_cumul[0]   # OLD WAY
+        # ccdf_imposed = cumul / cumul[0]
+        # imposed_on_model = np.interp(x_model, x_imposed, ccdf_imposed)
+        # W_value = np.sum(np.abs(imposed_on_model - ccdf_model) * np.diff(x_model, prepend=x_model[0]))
         W_value = calc_1d_wasserstein(x_ref=x_imposed, ccdf_ref=cumul, 
                                                      x_target=x_model, ccdf_target=model_cumul)
         W_by_pair[model_idx] = W_value
@@ -495,14 +524,26 @@ for group_name, group_indices in group_defs:
         continue
 
     # === Probability density plot (PDF) ===
+    if plot_theoCurve:
+        data = np.load('./PDF-simu.npy')
+        cy_area = data[:,0]
+        cy_pdf  = data[:,1]
+        # display the simulated PDF only between this range to avoid the artifact on small x
+        ymin_simu = 40001
+        ymax_simu = 1e10
+        msimu0 = cy_area >= ymin_simu
+        msimu1 = cy_area <= ymax_simu
+        msimu  = msimu0 * msimu1
+
     fig1 = plt.figure(figsize=(8, 6))
     ax1 = fig1.add_subplot(111)
     ax1.set_xlabel('Plate area (km'+r'$^2$'+')', fontweight='bold', fontname='Georgia', fontsize=14)
     ax1.set_ylabel('Probability Density', fontweight='bold', fontname='Georgia', fontsize=14)
     ax1.set_xscale('log')
     ax1.set_yscale('log')
+    ax1.grid(True, which='both', linewidth=0.2, alpha=0.45, color='0.5')
 
-    bird_plotted = False
+    first = True
     for i, idx in enumerate(group_valid_indices):
         model_name = called_models[idx]
         frame = int(called_frames[idx])
@@ -510,19 +551,37 @@ for group_name, group_indices in group_defs:
         midpoints = (bins[:-1] + bins[1:]) / 2
         bins_Bird_mid = (bins_Bird[:-1] + bins_Bird[1:]) / 2.0
 
-        if not bird_plotted:
+        if first:
             mask_bird = ~np.isnan(pdfBird) & (pdfBird > 0)
             if np.any(mask_bird):
-                ax1.plot(bins_Bird_mid[mask_bird], pdfBird[mask_bird], linestyle='-', linewidth=2, c='k', label='Bird (2003)')
-            bird_plotted = True
+                if plot_step:
+                    ax1.step(bins_Bird_mid[mask_bird], pdfBird[mask_bird], linestyle='--', linewidth=2, c='0.5', label='Bird (2003)')
+                else:
+                    ax1.plot(bins_Bird_mid[mask_bird], pdfBird[mask_bird], linestyle='--', linewidth=2, c='0.5', label='Bird (2003)')
+
+            if plot_theoCurve:
+                t_area = cy_area[msimu]
+                t_pdf = cy_pdf[msimu]
+                mask = ~np.isnan(t_pdf) & (t_pdf > 1e-25)
+                ax1.plot(t_area[mask], t_pdf[mask], color="#B06010", linewidth=2, label='Theoretical curve (Janin et al. 2025)')
+            first = False
 
         mask_pdf = ~np.isnan(pdf) & (pdf > 0)
         if allframes:
             color = imola_cmap(norm_idx(i))
-            ax1.plot(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5, color=color)
+            if plot_step:
+                ax1.step(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5, color=color)
+            else:
+                ax1.plot(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5, color=color)
         else:
-            ax1.plot(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5,
-                     color=cmap[i % len(cmap)], label=model_name)
+            if plot_step:
+                ax1.step(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5,
+                         color=cmap[i % len(cmap)], label=model_name)
+            else:
+                ax1.plot(midpoints[mask_pdf], pdf[mask_pdf], linestyle='-', linewidth=1.5,
+                         color=cmap[i % len(cmap)], label=model_name)
+            ax1.set_xlim(slim0,slim1)
+            ax1.set_ylim(ylim0,ylim1)
 
     ax1.legend(loc='best')
     if allframes:
@@ -547,6 +606,7 @@ for group_name, group_indices in group_defs:
     ax2.set_ylabel('Plate count', fontweight='bold', fontname='Georgia', fontsize=14)
     ax2.set_xscale('log')
     ax2.set_yscale('log')
+    ax2.grid(True, which='both', linewidth=0.2, alpha=0.45, color='0.5')
 
     x_models_all = []
     for i, idx in enumerate(group_valid_indices):
@@ -560,13 +620,20 @@ for group_name, group_indices in group_defs:
         mask_cumul = ~np.isnan(cumul) & (cumul > 0)
         if allframes:
             color = imola_cmap(norm_idx(i))
-            ax2.plot(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5, color=color)
+            if plot_step:
+                ax2.step(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5, color=color)
+            else:
+                ax2.plot(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5, color=color)
         else:
-            ax2.plot(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5,
+            if plot_step:
+                ax2.step(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5,
+                         color=cmap[i % len(cmap)], label=model_name)
+            else:
+                ax2.plot(bins[mask_cumul], cumul[mask_cumul], linestyle='-', linewidth=1.5,
                      color=cmap[i % len(cmap)], label=model_name)
 
     # Bird curve (same for each frame, so reusing last loaded values is fine)
-    ax2.plot(cumul_bins_Bird, cumul_Bird, linestyle='-', linewidth=2, c='k', label='Bird (2003)')
+    ax2.plot(cumul_bins_Bird, cumul_Bird, linestyle='--', linewidth=2, c='0.5', label='Bird (2003)')
 
     if allframes and plotSpread and len(x_models_all) > 0:
         xmin = min(x.min() for x in x_models_all)
@@ -696,17 +763,34 @@ if allframes:
     else:
         print('No valid total-plate-count data available. Fig3 was not saved.')
 
-print('\n=== Non-rigid plate areas ===')        # STILL TO DO: AVERAGE WHEN ALLFRAMES=True
+print('\n=== Non-rigid plate areas ===')
 for model_name in models:
-    for frame in sorted({frame for model, frame in frame_data.keys() if model == model_name}):
+    model_frames = sorted({frame for model, frame in frame_data.keys() if model == model_name})
+    per_frame_ratios = []
+    model_non_rigid_areas = []
+
+    for frame in model_frames:
         if (model_name, frame) not in frame_data:
             continue
-        pg = frame_data[(model_name, frame)]['pg']
-        total_surface_area = float(np.sum(pg.surfdim))
+        total_surface_area = float(frame_data[(model_name, frame)]['total_area'])
         non_rigid_area = float(frame_data[(model_name, frame)]['non_rigid_area'])
+        model_non_rigid_areas.append(non_rigid_area)
+
         ratio_pct = (non_rigid_area / total_surface_area * 100.0) if total_surface_area > 0 else 0.0
+        per_frame_ratios.append(ratio_pct)
+
+        if not allframes:
+            print(
+                f'{model_name} frame {frame}: non-rigid area = {non_rigid_area:.3e} km^2; '
+                f'ratio = {ratio_pct:.2f}% of total area ({total_surface_area:.3e} km^2)'
+            )
+
+    if allframes and per_frame_ratios:
+        avg_ratio_pct = float(np.mean(per_frame_ratios))
+        avg_non_rigid_area = float(np.mean(model_non_rigid_areas))
         print(
-            f'{model_name} frame {frame}: non-rigid area = {non_rigid_area:.3e} km^2; '
-            f'ratio = {ratio_pct:.2f}% of total area ({total_surface_area:.3e} km^2)'
+            f'{model_name}: average ratio across {len(per_frame_ratios)} frames = '
+            f'{avg_ratio_pct:.2f}% of total area; '
+            f'mean non-rigid area = {avg_non_rigid_area:.3e} km^2'
         )
         

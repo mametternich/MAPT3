@@ -2467,7 +2467,7 @@ class PlateGather:
             mRid  = mRid1 * mRid2
             mTra1 = abs(self.hvorb) > 10000
             mTra  = mTra1 * ~mSub * ~mRid
-            mOth  = ~mSub * ~mRid
+            mOth  = ~mSub * ~mRid * ~mTra
             pbtype = np.zeros(self.lonb.shape,dtype=np.int32)
             pbtype[mSub] = 1
             pbtype[mRid] = 2
@@ -2509,7 +2509,7 @@ class PlateGather:
             # COMPO[self.cont > 0] = 1
             # # prepare indices
             # ids = np.arange(len(self.x))
-            # subDir = np.zeros(len(pbtype),dtype=np.int32)-1
+            subDir = np.zeros(len(pbtype),dtype=np.int32)-1
             # for i in range(len(pbtype)):
             #     if pbtype[i] == 1:
             #         p1,p2 = self.platecouple[i]
@@ -2542,40 +2542,40 @@ class PlateGather:
             #             else:
             #                 subDir[i] = p1
                             
-            # # now cleaning ! Test all plate couples that have in common a subduction boundary and
-            # # and check if the solution is consistent and homogene for the entire plate boundary
-            # tested_couples = []
-            # bad_couples    = []
-            # #subDir_new = subDir.copy()
-            # subDir_new = np.zeros(len(pbtype),dtype=np.int32)-1
-            # for i in range(len(self.xb)):
-            #     couplei = list(self.platecouple[i,:])
-            #     if couplei not in tested_couples and couplei[::-1] not in tested_couples and \
-            #     couplei not in bad_couples    and couplei[::-1] not in bad_couples:
-            #         cp1 = couplei[0]
-            #         cp2 = couplei[1]
-            #         m11 = self.platecouple[:,0] == cp1
-            #         m12 = self.platecouple[:,1] == cp2
-            #         m21 = self.platecouple[:,0] == cp2
-            #         m22 = self.platecouple[:,1] == cp1
-            #         m   = m11*m12 + m21*m22
-            #         ms  = self.pbtype[m] == 1
-            #         if np.count_nonzero(ms) == 0:
-            #             bad_couples.append(couplei)
-            #         else:
-            #             tested_couples.append(couplei)
-            #             idb = np.arange(len(self.lonb))
-            #             subDirp1 = np.count_nonzero(subDir[idb[m][ms]] == cp1)/len(idb[m][ms])
-            #             subDirp2 = 1-subDirp1
-            #             if subDirp1 >= 0.75:
-            #                 # dominated by the subduction of the plate p1 beneath the plate p2
-            #                 subDir_new[idb[m][ms]] = cp1
-            #             elif subDirp2 >= 0.75:
-            #                 # dominated by the subduction of the plate p2 beneath the plate p1
-            #                 subDir_new[idb[m][ms]] = cp2
+            # now cleaning ! Test all plate couples that have in common a subduction boundary and
+            # and check if the solution is consistent and homogene for the entire plate boundary
+            tested_couples = []
+            bad_couples    = []
+            subDir_new = subDir.copy()
+            subDir_new = np.zeros(len(pbtype),dtype=np.int32)-1
+            for i in range(len(self.xb)):
+                couplei = list(self.platecouple[i,:])
+                if couplei not in tested_couples and couplei[::-1] not in tested_couples and \
+                couplei not in bad_couples    and couplei[::-1] not in bad_couples:
+                    cp1 = couplei[0]
+                    cp2 = couplei[1]
+                    m11 = self.platecouple[:,0] == cp1
+                    m12 = self.platecouple[:,1] == cp2
+                    m21 = self.platecouple[:,0] == cp2
+                    m22 = self.platecouple[:,1] == cp1
+                    m   = m11*m12 + m21*m22
+                    ms  = self.pbtype[m] == 1
+                    if np.count_nonzero(ms) == 0:
+                        bad_couples.append(couplei)
+                    else:
+                        tested_couples.append(couplei)
+                        idb = np.arange(len(self.lonb))
+                        subDirp1 = np.count_nonzero(subDir[idb[m][ms]] == cp1)/len(idb[m][ms])
+                        subDirp2 = 1-subDirp1
+                        if subDirp1 >= 0.75:
+                            # dominated by the subduction of the plate p1 beneath the plate p2
+                            subDir_new[idb[m][ms]] = cp1
+                        elif subDirp2 >= 0.75:
+                            # dominated by the subduction of the plate p2 beneath the plate p1
+                            subDir_new[idb[m][ms]] = cp2
 
-            # subDir_old  = subDir.copy()
-            # self.subDir = subDir_new
+            subDir_old  = subDir.copy()
+            self.subDir = subDir_new
             
             if plot:
                 fig = plt.figure()
@@ -2583,35 +2583,35 @@ class PlateGather:
                 ax.set_title('Plate boundary type',fontweight='bold', fontname='Georgia', fontsize=14)
                 ax.set_global()
                 #ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
-                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c='blue',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c='red',alpha=1,transform=ccrs.PlateCarree())
                 # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
-                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='red',alpha=1,transform=ccrs.PlateCarree())
-                #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='green',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='blue',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='green',alpha=1,transform=ccrs.PlateCarree())
                 ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
-                ax.legend(loc='lower left', labels=['Subduction','MOR','Other'])
+                ax.legend(loc='lower left', labels=['Subduction','MOR','Transform','Other'])
                 plt.show()
-                #
-                # fig = plt.figure()
-                # ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
-                # ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITHOUT cleaning')
-                # ax.set_global()
+                
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITHOUT cleaning')
+                ax.set_global()
                 # ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
-                # # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_old[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_old[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
+                # ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                # #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
+                plt.show()
+                
+                fig = plt.figure()
+                ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+                ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITH cleaning')
+                ax.set_global()
+                # ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
+                ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_new[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
                 # ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
                 # #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
                 # ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
-                # plt.show()
-                #
-                # fig = plt.figure()
-                # ax  = fig.add_subplot(1,1,1, projection=ccrs.Robinson())
-                # ax.set_title('Diagnostic on the plate boundaries: Subduction zones WITH cleaning')
-                # ax.set_global()
-                # ax.scatter(self.lon,self.lat,s=1,c=self.plateID,cmap='jet',transform=ccrs.PlateCarree())
-                # # ax.scatter(self.lonb[mSub],self.latb[mSub],s=3,c=subDir_new[mSub],cmap='jet',alpha=1,transform=ccrs.PlateCarree())
-                # ax.scatter(self.lonb[mRid],self.latb[mRid],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
-                # #ax.scatter(self.lonb[mTra],self.latb[mTra],s=3,c='black',alpha=1,transform=ccrs.PlateCarree())
-                # ax.scatter(self.lonb[mOth],self.latb[mOth],s=3,c='k',alpha=1,transform=ccrs.PlateCarree())
-                # plt.show()
+                plt.show()
 
             if plateID is not None:
                 mp1 = self.platecouple[:,0] == plateID

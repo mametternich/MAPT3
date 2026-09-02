@@ -22,7 +22,8 @@ Project.set('../myparameters.py')
 
 # -----------------------------------------------------------------------------
 # # Define the models to loop over
-models = ['fDys20_eta20-sc','fDys30_eta20-sc','fDys50_eta20-sc']
+# models = ['fDys20_eta20-sc','fDys30_eta20-sc','fDys50_eta20-sc']
+models = ['fDys30-T0init1600']
 
 # Set allframes to True to automatically detect all available frames,
 # or False to use the manually specified frames list below
